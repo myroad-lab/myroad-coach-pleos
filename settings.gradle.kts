@@ -1,0 +1,20 @@
+pluginManagement {
+    repositories {
+        google()
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    repositories {
+        google()
+        mavenCentral()
+        // Pleos Playground Maven (Pleos Connect SDK)
+        maven { url = uri("https://nexus-playground.pleos.ai/repository/maven-releases/") }
+    }
+}
+
+rootProject.name = "MyRoadCoach"
+include(":app")

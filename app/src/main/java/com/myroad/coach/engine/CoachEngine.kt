@@ -1,6 +1,9 @@
 package com.myroad.coach.engine
 
 import com.myroad.coach.data.CoachingCard
+import com.myroad.coach.data.HabitAnalyzer
+import com.myroad.coach.data.HabitReport
+import com.myroad.coach.data.TripRecord
 import com.myroad.coach.data.Judgement
 import com.myroad.coach.data.MomentKind
 import com.myroad.coach.data.RiskMoment
@@ -42,6 +45,7 @@ data class CoachUiState(
     val coachedCount: Int = 0,
     val assistantAnswer: String? = null,
     val requestHighlightTab: Long = 0L,
+    val report: HabitReport = HabitAnalyzer.analyze(emptyList()),
 )
 
 /**
@@ -52,6 +56,7 @@ data class CoachUiState(
 class CoachEngine(
     private val speak: (String) -> Unit,
     private val clock: () -> String = { SimpleDateFormat("HH:mm", Locale.KOREA).format(Date()) },
+    private val onHistoryChanged: (List<TripRecord>) -> Unit = {},
 ) {
     private val _state = MutableStateFlow(CoachUiState())
     val state: StateFlow<CoachUiState> = _state.asStateFlow()
@@ -69,7 +74,39 @@ class CoachEngine(
 
     private var tripMoments = mutableListOf<RiskMoment>()
     private var tripStartedAt: String? = null
+    private var tripStartMillis = 0L
+    private var tripPasses = mutableMapOf<RoadType, Int>()
+    private var tripDistanceKm = 0f
+    private var tripRainy = false
+    private var tripNight = false
+    private var lastCautionCounted: RoadType? = null
     private var nextId = 100
+
+    /** 저장된 전체 주행 기록 */
+    private var history: List<TripRecord> = emptyList()
+
+    /** 저장소에서 읽은 기록으로 습관 통계와 약점 유형을 계산합니다. */
+    fun setHistory(trips: List<TripRecord>) {
+        history = trips
+        nextId = (trips.flatMap { t -> t.moments.map { it.id } }.maxOrNull() ?: 99) + 1
+        recompute(notify = false)
+    }
+
+    private fun recompute(notify: Boolean) {
+        val report = HabitAnalyzer.analyze(history)
+        weakTypes = if (report.isEnough && report.weakTypes.isNotEmpty()) {
+            report.weakTypes + setOfNotNull(report.signalFocusType)
+        } else {
+            SampleData.weakTypes
+        }
+        _state.update { it.copy(report = report) }
+        if (notify) onHistoryChanged(history)
+    }
+
+    /** 이번 주행 거리 (Odometer / 위치 누적 / 시나리오에서 입력) */
+    fun onTripDistance(km: Float) {
+        tripDistanceKm = km
+    }
 
     var clockOverride: (() -> String)? = null
     private fun now() = clockOverride?.invoke() ?: clock()
@@ -83,6 +120,11 @@ class CoachEngine(
         if (driving && prev == DriveState.PARKED) {
             tripMoments = mutableListOf()
             tripStartedAt = now()
+            tripStartMillis = System.currentTimeMillis()
+            tripPasses = mutableMapOf()
+            tripDistanceKm = 0f
+            tripRainy = false
+            tripNight = false
             _state.update { it.copy(driveState = DriveState.DRIVING, coaching = null, coachedCount = 0) }
         } else if (!driving && prev == DriveState.DRIVING) {
             finishTrip()
@@ -116,8 +158,11 @@ class CoachEngine(
         }
     }
 
-    fun onConditions(rainy: Boolean, night: Boolean) =
+    fun onConditions(rainy: Boolean, night: Boolean) {
+        if (rainy) tripRainy = true
+        if (night) tripNight = true
         _state.update { it.copy(signals = it.signals.copy(rainy = rainy, night = night)) }
+    }
 
     // ───────────────────────── 내비게이션 ─────────────────────────
 
@@ -154,6 +199,13 @@ class CoachEngine(
     /** NaviHelper onCautionPointInfo */
     fun onCautionPoint(type: RoadType, remainMeters: Int) {
         if (type == RoadType.OTHER) return
+        // 통과 횟수 집계 (주의 구간 30m 이내 진입 시 1회)
+        if (remainMeters <= PASS_METERS && lastCautionCounted != type) {
+            lastCautionCounted = type
+            tripPasses[type] = (tripPasses[type] ?: 0) + 1
+        } else if (remainMeters > 100 && lastCautionCounted == type) {
+            lastCautionCounted = null
+        }
         if (activeType == null || remainMeters < lastDistance) {
             _state.update { it.copy(next = NextManeuver(type, remainMeters, type.label)) }
         }
@@ -170,6 +222,9 @@ class CoachEngine(
 
     private fun closeManeuver() {
         val type = activeType
+        if (type != null && lastDistance <= PASS_METERS) {
+            tripPasses[type] = (tripPasses[type] ?: 0) + 1
+        }
         if (type != null && RoadTypeMapper.needsSignal(type) && steeredThisManeuver && !signalUsedThisManeuver) {
             record(MomentKind.NO_SIGNAL, type, "${type.label}할 때 방향지시등이 꺼져 있었어요")
             steeredThisManeuver = false
@@ -193,60 +248,85 @@ class CoachEngine(
     private fun finishTrip() {
         closeManeuver()
         val end = now()
+        val record = TripRecord(
+            id = System.currentTimeMillis(),
+            startedAt = tripStartMillis,
+            startLabel = tripStartedAt ?: end,
+            endLabel = end,
+            distanceKm = tripDistanceKm,
+            rainy = tripRainy,
+            night = tripNight,
+            passes = tripPasses.toMap(),
+            moments = tripMoments.toList(),
+        )
+        history = history + record
         _state.update {
             it.copy(
                 driveState = DriveState.PARKED,
                 coaching = null,
                 next = null,
-                moments = tripMoments.toList(),
-                tripStart = tripStartedAt ?: it.tripStart,
+                moments = record.moments,
+                tripSummary = if (tripDistanceKm > 0f) "최근 주행 · ${"%.1f".format(Locale.US, tripDistanceKm)}km" else "최근 주행",
+                tripStart = record.startLabel,
                 tripEnd = end,
                 requestHighlightTab = System.currentTimeMillis(),
             )
         }
+        recompute(notify = true)
     }
 
     // ───────────────────────── 정차 중 조작 ─────────────────────────
 
     /** 하이라이트에서 '앞에 돌발 상황이 있었어요' / '맞아요' */
-    fun setJudgement(id: Int, external: Boolean) = _state.update { st ->
-        st.copy(moments = st.moments.map {
-            if (it.id == id) it.copy(
-                judgement = if (external) Judgement.EXCLUDED_BY_DRIVER else Judgement.HABIT_SUSPECTED,
-            ) else it
-        })
+    fun setJudgement(id: Int, external: Boolean) {
+        val j = if (external) Judgement.EXCLUDED_BY_DRIVER else Judgement.HABIT_SUSPECTED
+        _state.update { st -> st.copy(moments = st.moments.map { if (it.id == id) it.copy(judgement = j) else it }) }
+        if (history.any { t -> t.moments.any { it.id == id } }) {
+            history = history.map { t -> t.copy(moments = t.moments.map { if (it.id == id) it.copy(judgement = j) else it }) }
+            recompute(notify = true)
+        }
     }
 
     fun answerWeekly() {
-        val answer = "합류 구간 급제동이 40% 줄었어요. 다음 주에는 비 오는 날 회전교차로를 함께 연습해 볼게요."
+        val answer = _state.value.report.summary
         _state.update { it.copy(assistantAnswer = answer) }
         speak(answer)
     }
 
     private fun coachingFor(type: RoadType, remain: Int): CoachingCard {
         val rounded = (remain / 100.0).let { kotlin.math.round(it) * 100 }.toInt().coerceAtLeast(100)
-        return when (type) {
-            RoadType.MERGE -> CoachingCard(
-                type, rounded, "${rounded}m 앞 합류 구간", "지금 미리 속도를 맞춰 보세요",
-                "합류 구간에서 급제동이 평소보다 3.1배 많았어요",
+        val report = _state.value.report
+        val ratio = report.weakRoads.firstOrNull { it.type == type }?.ratio?.takeIf { it >= 1f }
+        val ratioText = ratio?.let { "평소보다 ${it}배 많았어요" } ?: "자주 있었어요"
+        // 이 구간에서 가장 많이 나온 습관에 맞춰 안내 문장을 고릅니다.
+        val signalHabit = report.signalFocusType == type
+        return when {
+            signalHabit -> CoachingCard(
+                type, rounded, "${rounded}m 앞 ${type.label}", "방향지시등을 미리 켜 주세요",
+                "${type.label} 때 방향지시등을 자주 놓쳤어요",
             )
-            RoadType.IC_EXIT -> CoachingCard(
+            type == RoadType.MERGE -> CoachingCard(
+                type, rounded, "${rounded}m 앞 합류 구간", "지금 미리 속도를 맞춰 보세요",
+                "합류 구간에서 급제동이 $ratioText",
+            )
+            type == RoadType.ROUNDABOUT -> CoachingCard(
+                type, rounded, "${rounded}m 앞 회전교차로", "진입 전에 충분히 속도를 줄여 주세요",
+                "회전교차로에서 급제동이 $ratioText",
+            )
+            type == RoadType.IC_EXIT -> CoachingCard(
                 type, rounded, "${rounded}m 앞 IC 진출", "방향지시등을 미리 켜 주세요",
                 "IC 진출 때 방향지시등을 자주 놓쳤어요",
             )
-            RoadType.ROUNDABOUT -> CoachingCard(
-                type, rounded, "${rounded}m 앞 회전교차로", "진입 전에 충분히 속도를 줄여 주세요",
-                "비 오는 날 회전교차로에서 급제동이 잦았어요",
-            )
             else -> CoachingCard(
                 type, rounded, "${rounded}m 앞 ${type.label}", "미리 준비해 주세요",
-                "이 유형에서 위험 순간이 평소보다 많았어요",
+                "이 구간에서 위험 순간이 $ratioText",
             )
         }
     }
 
     companion object {
         const val LATE_BRAKE_METERS = 50
+        const val PASS_METERS = 30
         const val SIGNAL_WINDOW_METERS = 100
         const val TURN_STEER_DEGREES = 30f
         val DECELERATION_TYPES = setOf(

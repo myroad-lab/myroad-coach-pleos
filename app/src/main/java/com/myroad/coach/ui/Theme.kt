@@ -20,6 +20,7 @@ object PleosColor {
     val buttonBasic = Color(0x0D121417)      // button_basic_enabled (alpha_dark_50)
     val buttonBasicPressed = Color(0x17121417)
     val buttonFilled = Color(0xFF3F434B)     // button_filled_enabled (basic_600)
+    val buttonFilledPressed = Color(0xFF2C2F35) // button_filled_pressed (basic_700)
 
     val active = Color(0xFF02C265)           // informative_active
     val positive = Color(0xFF0064FF)         // informative_positive

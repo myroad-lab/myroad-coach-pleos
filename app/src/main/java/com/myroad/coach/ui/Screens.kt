@@ -59,9 +59,14 @@ fun DrivingCoachScreen(state: CoachUiState) {
                     .background(PleosColor.cautionSoft)
                     .padding(horizontal = 44.dp, vertical = 40.dp),
             ) {
+                // Pleos 'Driving Notification' 구조: 아이콘 + 제목 + 설명
                 Column {
-                    Chip("나의 약점 구간", bg = Color.White, fg = PleosColor.cautionText)
-                    Spacer(Modifier.height(26.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        CautionIcon()
+                        Spacer(Modifier.width(20.dp))
+                        Chip("나의 약점 구간", bg = Color.White, fg = PleosColor.cautionText)
+                    }
+                    Spacer(Modifier.height(28.dp))
                     Text(card.headline, style = PleosType.headlineS.copy(fontSize = 60.sp, lineHeight = 76.sp))
                     Spacer(Modifier.height(22.dp))
                     Text(card.action, style = PleosType.titleM.copy(fontWeight = FontWeight.SemiBold))
@@ -191,8 +196,11 @@ private fun TripMap(moments: List<RiskMoment>, summary: String, modifier: Modifi
             }
         }
         Row(Modifier.padding(24.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Chip(summary, bg = Color.White)
-            if (moments.any { it.rainy }) Chip("우천", bg = Color.White, fg = PleosColor.positive)
+            val pill = RoundedCornerShape(999.dp)
+            Chip(summary, bg = Color.White, modifier = with(PleosShadow) { Modifier.level1(pill) })
+            if (moments.any { it.rainy }) {
+                Chip("우천", bg = Color.White, fg = PleosColor.positive, modifier = with(PleosShadow) { Modifier.level1(pill) })
+            }
         }
     }
 }

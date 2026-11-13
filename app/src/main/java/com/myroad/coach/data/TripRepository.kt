@@ -61,6 +61,8 @@ class TripRepository(context: Context) {
         put("rainy", t.rainy)
         put("night", t.night)
         put("isSample", t.isSample)
+        // 경로: [위도, 경도, 위도, 경도, ...]
+        put("route", JSONArray().apply { t.route.forEach { p -> put(p.lat); put(p.lng) } })
         put("passes", JSONObject().apply { t.passes.forEach { (k, v) -> put(k.name, v) } })
         put("moments", JSONArray().apply {
             t.moments.forEach { m ->
@@ -75,6 +77,8 @@ class TripRepository(context: Context) {
                     put("mapX", m.mapX.toDouble())
                     put("mapY", m.mapY.toDouble())
                     put("judgement", m.judgement.name)
+                    m.lat?.let { put("lat", it) }
+                    m.lng?.let { put("lng", it) }
                 })
             }
         })
@@ -101,9 +105,14 @@ class TripRepository(context: Context) {
                     mapX = m.getDouble("mapX").toFloat(),
                     mapY = m.getDouble("mapY").toFloat(),
                     judgement = Judgement.valueOf(m.optString("judgement", Judgement.HABIT_SUSPECTED.name)),
+                    lat = if (m.has("lat")) m.getDouble("lat") else null,
+                    lng = if (m.has("lng")) m.getDouble("lng") else null,
                 )
             }.getOrNull()
         }
+        val routeJson = o.optJSONArray("route")
+        val route = if (routeJson == null) emptyList() else
+            (0 until routeJson.length() / 2).map { GeoPoint(routeJson.getDouble(it * 2), routeJson.getDouble(it * 2 + 1)) }
         return TripRecord(
             id = o.getLong("id"),
             startedAt = o.getLong("startedAt"),
@@ -116,6 +125,7 @@ class TripRepository(context: Context) {
             moments = moments,
             // 이전 버전에 저장된 샘플 기록은 isSample 값이 없으므로 샘플 고유 번호(1,000,000 미만)로 구분
             isSample = o.optBoolean("isSample", o.getLong("id") < 1_000_000L),
+            route = route,
         )
     }
 

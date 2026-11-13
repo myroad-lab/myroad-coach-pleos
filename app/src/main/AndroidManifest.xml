@@ -12,6 +12,9 @@
     <uses-permission android:name="pleos.car.permission.CAR_LIGHTS" />
     <!-- NaviHelper SDK: TBT / 주의 구간 / 단속 카메라 정보 -->
     <uses-permission android:name="pleos.car.permission.NAVI_ROUTE" />
+    <!-- 하이라이트 지도 타일(OpenStreetMap 기반 OpenFreeMap) 불러오기 -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <!-- FusedLocation SDK -->
     <uses-permission android:name="pleos.car.permission.FUSED_LOCATION" />
     <!-- TextToSpeech SDK -->

@@ -18,6 +18,8 @@ data class TripRecord(
     val moments: List<RiskMoment>,
     /** 시연용 샘플 기록이면 true (화면에 '시연용 샘플' 표시) */
     val isSample: Boolean = false,
+    /** 주행 경로 (위치 정보가 있을 때, 최대 수백 개로 줄여 저장) */
+    val route: List<GeoPoint> = emptyList(),
 )
 
 data class HabitReport(

@@ -19,6 +19,9 @@ enum class RoadType(val label: String) {
     OTHER("기타"),
 }
 
+/** 위도·경도 */
+data class GeoPoint(val lat: Double, val lng: Double)
+
 /** 위험 순간의 종류 = 습관의 단위 */
 enum class MomentKind(val label: String) {
     HARD_BRAKE("급제동"),
@@ -48,6 +51,9 @@ data class RiskMoment(
     val mapX: Float,
     val mapY: Float,
     val judgement: Judgement = Judgement.HABIT_SUSPECTED,
+    /** 위험 순간이 기록된 실제 위치 (위치 정보가 없으면 null) */
+    val lat: Double? = null,
+    val lng: Double? = null,
 )
 
 data class Habit(
@@ -72,23 +78,30 @@ data class CoachingCard(
 
 /** 정차 중 화면용 예시 데이터. 실제 주행 기록이 쌓이면 CoachEngine이 이 값을 대체합니다. */
 object SampleData {
-    val tripSummary = "출근 · 24.6km · 36분"
+    val tripSummary = "출근 · ${DemoRoute.DISTANCE_KM}km · 21분"
     val tripStart = "08:31"
-    val tripEnd = "09:07"
+    val tripEnd = "08:52"
+    val route: List<GeoPoint> = DemoRoute.points
+    private val mergePoint = DemoRoute.points[DemoRoute.MERGE_INDEX - 1]
+    private val icPoint = DemoRoute.points[DemoRoute.IC_EXIT_INDEX]
+    private val schoolPoint = DemoRoute.points[DemoRoute.SCHOOL_INDEX]
     val averageMoments = "최근 출근 평균 4.2건"
 
     val moments = listOf(
         RiskMoment(
-            1, "08:42", MomentKind.HARD_BRAKE, RoadType.MERGE, rainy = true, night = false,
+            1, "08:34", MomentKind.HARD_BRAKE, RoadType.MERGE, rainy = true, night = false,
             cause = "합류 지점 40m 전에서야 브레이크를 밟았어요", mapX = 0.24f, mapY = 0.66f,
+            lat = mergePoint.lat, lng = mergePoint.lng,
         ),
         RiskMoment(
-            2, "08:55", MomentKind.NO_SIGNAL, RoadType.IC_EXIT, rainy = true, night = false,
+            2, "08:43", MomentKind.NO_SIGNAL, RoadType.IC_EXIT, rainy = true, night = false,
             cause = "우측 진출 중 방향지시등이 꺼져 있었어요", mapX = 0.58f, mapY = 0.42f,
+            lat = icPoint.lat, lng = icPoint.lng,
         ),
         RiskMoment(
-            3, "09:02", MomentKind.SPEEDING, RoadType.SCHOOL_ZONE, rainy = true, night = false,
+            3, "08:49", MomentKind.SPEEDING, RoadType.SCHOOL_ZONE, rainy = true, night = false,
             cause = "제한속도 30km/h 단속 구간이었어요", mapX = 0.80f, mapY = 0.18f,
+            lat = schoolPoint.lat, lng = schoolPoint.lng,
         ),
     )
 

@@ -33,12 +33,31 @@ class EngineTest {
         assertEquals(2, st.coachedCount, "합류 + IC 진출 두 번 코칭")
         assertTrue(spoken.any { it.startsWith("500m 앞 합류 구간") })
         assertEquals(listOf(MomentKind.HARD_BRAKE, MomentKind.NO_SIGNAL, MomentKind.SPEEDING), st.moments.map { it.kind })
-        assertEquals("08:42", st.moments[0].time)
-        assertEquals("08:55", st.moments[1].time)
-        assertEquals("09:02", st.moments[2].time)
+        assertEquals("08:34", st.moments[0].time)
+        assertEquals("08:43", st.moments[1].time)
+        assertEquals("08:49", st.moments[2].time)
         assertEquals("08:31", st.tripStart)
-        assertEquals("09:07", st.tripEnd)
+        assertEquals("08:52", st.tripEnd)
         assertTrue(st.moments.all { it.rainy })
+        // 실제 경로 좌표: 위험 순간마다 위치가 있고, 경로와 거리가 위치로 계산됨
+        assertTrue(st.moments.all { it.lat != null && it.lng != null })
+        assertTrue(st.route.size > 50, "경로 점 ${st.route.size}개")
+        val km = st.tripSummary.substringAfter("· ").substringBefore("km").toFloat()
+        assertTrue(km in 14.5f..16f, "주행 거리 $km km (경로 약 15.2km)")
+        // 합류 급제동 위치는 실제 경부고속도로 합류 지점 근처 (200m 이내)
+        val merge = com.myroad.coach.data.DemoRoute.points[com.myroad.coach.data.DemoRoute.MERGE_INDEX]
+        val d = CoachEngine.distanceMeters(com.myroad.coach.data.GeoPoint(st.moments[0].lat!!, st.moments[0].lng!!), merge)
+        assertTrue(d < 200.0, "합류 지점과의 거리 ${d}m")
+    }
+
+    @Test
+    fun locationWhileParkedIsNotRecorded() {
+        val engine = CoachEngine(speak = {})
+        engine.onLocation(37.4, 127.1)
+        engine.onLocation(37.5, 127.0)
+        engine.onDriveState(true)
+        engine.onDriveState(false)
+        assertTrue(engine.state.value.route.size <= 1)
     }
 
     @Test

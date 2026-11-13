@@ -31,31 +31,35 @@ import androidx.compose.ui.unit.dp
 val CardShape = RoundedCornerShape(28.dp)
 
 @Composable
-fun Chip(text: String, bg: Color = PleosColor.buttonBasic, fg: Color = PleosColor.text2) {
+fun Chip(text: String, bg: Color = PleosColor.buttonBasic, fg: Color = PleosColor.text2, modifier: Modifier = Modifier) {
     Text(
         text,
         style = PleosType.label.copy(color = fg),
-        modifier = Modifier
+        modifier = modifier
             .clip(RoundedCornerShape(999.dp))
             .background(bg)
             .padding(horizontal = 18.dp, vertical = 8.dp),
     )
 }
 
+/** Pleos 'Basic button': 누르면 배경색이 진해지고 95%로 축소 */
 @Composable
 fun PleosButton(text: String, filled: Boolean = false, onClick: () -> Unit) {
-    Text(
-        text,
-        style = PleosType.bodyM.copy(
-            fontWeight = FontWeight.SemiBold,
-            color = if (filled) Color.White else PleosColor.text1,
-        ),
-        modifier = Modifier
-            .clip(RoundedCornerShape(20.dp))
-            .background(if (filled) PleosColor.buttonFilled else PleosColor.buttonBasic)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 30.dp, vertical = 18.dp),
-    )
+    PressableSurface(
+        onClick = onClick,
+        shape = RoundedCornerShape(20.dp),
+        color = if (filled) PleosColor.buttonFilled else PleosColor.buttonBasic,
+        pressedColor = if (filled) PleosColor.buttonFilledPressed else PleosColor.buttonBasicPressed,
+    ) {
+        Text(
+            text,
+            style = PleosType.bodyM.copy(
+                fontWeight = FontWeight.SemiBold,
+                color = if (filled) Color.White else PleosColor.text1,
+            ),
+            modifier = Modifier.padding(horizontal = 30.dp, vertical = 18.dp),
+        )
+    }
 }
 
 @Composable
@@ -133,13 +137,12 @@ fun SegmentedMenu(items: List<String>, selected: Int, onSelect: (Int) -> Unit) {
 
 @Composable
 fun IconButtonBox(onClick: () -> Unit, content: @Composable () -> Unit) {
-    Box(
-        Modifier
-            .size(72.dp)
-            .clip(RoundedCornerShape(20.dp))
-            .background(PleosColor.buttonBasic)
-            .clickable(onClick = onClick),
-        contentAlignment = Alignment.Center,
+    PressableSurface(
+        onClick = onClick,
+        shape = RoundedCornerShape(20.dp),
+        color = PleosColor.buttonBasic,
+        pressedColor = PleosColor.buttonBasicPressed,
+        modifier = Modifier.size(72.dp),
     ) { content() }
 }
 

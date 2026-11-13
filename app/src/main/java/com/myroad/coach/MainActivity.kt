@@ -5,6 +5,12 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import com.myroad.coach.ui.SegmentedMenu
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -122,14 +128,20 @@ private fun AppRoot(
     }
     val driving = state.driveState == DriveState.DRIVING
 
-    Box(Modifier.fillMaxSize().background(PleosColor.background)) {
+    BoxWithConstraints(Modifier.fillMaxSize().background(PleosColor.background)) {
+        // 가로 창은 탭을 헤더 안에, 세로 창(840dp)은 헤더 아래 줄에 둡니다.
+        val tabsInHeader = maxWidth >= 1300.dp
         Column(Modifier.fillMaxSize()) {
-            // ── Page Navigation (Pleos 가이드: 앱 아이콘 + 제목▼ + Suffix) ──
+            // ── Page Navigation (Pleos 가이드: 앱 아이콘 + 제목 + Suffix) + Tabs(Box) ──
             PageNavigation(
-                title = if (driving) "주행 코치" else PAGES[page],
+                title = if (driving) "주행 코치" else "마이로드 코치",
                 pages = PAGES,
-                onSelectPage = if (driving) null else ({ i: Int -> page = i }),
+                onSelectPage = null,
             ) {
+                if (!driving && tabsInHeader) {
+                    SegmentedMenu(PAGES, page) { page = it }
+                    Spacer(Modifier.width(8.dp))
+                }
                 if (driving) {
                     // 주행 중에는 조작 요소를 숨기고 상태만 표시
                     Chip("● 코칭 켜짐", bg = PleosColor.activeSoft, fg = PleosColor.active)
@@ -151,6 +163,11 @@ private fun AppRoot(
                         ),
                         footer = sdkStatus(),
                     )
+                }
+            }
+            if (!driving && !tabsInHeader) {
+                Row(Modifier.padding(start = 40.dp, end = 40.dp, bottom = 20.dp)) {
+                    SegmentedMenu(PAGES, page) { page = it }
                 }
             }
             Box(Modifier.fillMaxWidth().height(1.dp).background(PleosColor.line))

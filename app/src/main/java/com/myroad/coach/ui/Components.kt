@@ -108,29 +108,39 @@ fun AppMark(size: Dp = 60.dp) {
 }
 
 /** 세그먼트 메뉴 (Pleos segmented menu 컴포넌트 형태) */
+/**
+ * Pleos 'Tabs' 컴포넌트 (Box 타입).
+ * 회색 컨테이너 안에서 선택된 탭만 흰 박스로 올라오고(Selected indicator + Shadow Level 1),
+ * 누르는 동안 95%로 축소됩니다.
+ */
 @Composable
 fun SegmentedMenu(items: List<String>, selected: Int, onSelect: (Int) -> Unit) {
     Row(
         Modifier
-            .clip(RoundedCornerShape(20.dp))
+            .clip(RoundedCornerShape(22.dp))
             .background(PleosColor.buttonBasic)
             .padding(6.dp),
         horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         items.forEachIndexed { i, label ->
             val on = i == selected
-            Text(
-                label,
-                style = PleosType.bodyS.copy(
-                    fontWeight = FontWeight.SemiBold,
-                    color = if (on) PleosColor.text1 else PleosColor.text2,
-                ),
-                modifier = Modifier
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(if (on) Color.White else Color.Transparent)
-                    .clickable { onSelect(i) }
-                    .padding(horizontal = 28.dp, vertical = 14.dp),
-            )
+            val shape = RoundedCornerShape(18.dp)
+            PressableSurface(
+                onClick = { onSelect(i) },
+                shape = shape,
+                color = if (on) Color.White else Color.Transparent,
+                pressedColor = if (on) Color.White else PleosColor.buttonBasicPressed,
+                modifier = if (on) with(PleosShadow) { Modifier.level1(shape) } else Modifier,
+            ) {
+                Text(
+                    label,
+                    style = PleosType.bodyM.copy(
+                        fontWeight = if (on) FontWeight.Bold else FontWeight.Medium,
+                        color = if (on) PleosColor.text1 else PleosColor.text2,
+                    ),
+                    modifier = Modifier.padding(horizontal = 30.dp, vertical = 16.dp),
+                )
+            }
         }
     }
 }

@@ -19,6 +19,8 @@ release APK 만들기: `./gradlew assembleRelease` → `app/build/outputs/apk/re
 
 판단 로직 단위 테스트: `./gradlew test`
 
+자동 빌드: PR과 main push마다 GitHub Actions(`.github/workflows/android-build.yml`)가 단위 테스트와 debug/release APK 빌드를 실행합니다. 빌드된 release APK는 Actions 실행 결과의 Artifacts(`myroad-coach-release-apk`)에서 내려받을 수 있습니다.
+
 ## 테스트 환경
 
 - Android Studio (최신 버전), Android SDK API 34

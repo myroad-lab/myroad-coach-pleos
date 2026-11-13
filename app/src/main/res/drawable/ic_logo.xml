@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  마이로드 코치 로고 (A 시안)
+  초록→파랑 그라데이션 위에, 앞으로 굽어지는 길 + 주황 점(약점 구간) + 음파(미리 들려주는 코칭)
+  원본: docs/brand/logo.svg
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="512dp"
+    android:height="512dp"
+    android:viewportWidth="512"
+    android:viewportHeight="512">
+    <!-- 배경: 모서리가 둥근 사각형 (rx 116) -->
+    <path android:pathData="M116,0 L396,0 A116,116 0 0 1 512,116 L512,396 A116,116 0 0 1 396,512 L116,512 A116,116 0 0 1 0,396 L0,116 A116,116 0 0 1 116,0 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="linear"
+                android:startX="0" android:startY="0"
+                android:endX="512" android:endY="512"
+                android:startColor="#FF02C265"
+                android:endColor="#FF0064FF" />
+        </aapt:attr>
+    </path>
+    <!-- 길 -->
+    <path
+        android:pathData="M150,430 C150,330 190,280 260,250 S360,190 362,92"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="58"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000" />
+    <!-- 약점 구간 (주황 점 + 흰 테두리) -->
+    <path
+        android:pathData="M220,249 A42,42 0 1 1 304,249 A42,42 0 1 1 220,249 Z"
+        android:fillColor="#FFFFFFFF" />
+    <path
+        android:pathData="M232,249 A30,30 0 1 1 292,249 A30,30 0 1 1 232,249 Z"
+        android:fillColor="#FFF29A00" />
+    <!-- 음파 (미리 들려주는 코칭) -->
+    <path
+        android:pathData="M318,300 A70,70 0 0 0 344,260"
+        android:strokeColor="#F2FFFFFF"
+        android:strokeWidth="16"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000" />
+    <path
+        android:pathData="M346,334 A116,116 0 0 0 390,268"
+        android:strokeColor="#B3FFFFFF"
+        android:strokeWidth="16"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000" />
+</vector>

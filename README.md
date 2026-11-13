@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/brand/logo-horizontal-light.png" alt="마이로드 코치 MyRoad Coach" width="440">
+</p>
+
 # 마이로드 코치 (MyRoad Coach)
 
 차량 데이터로 나의 나쁜 운전 습관을 찾아 알려 주고, 그 습관이 자주 나오는 도로 유형에 들어서기 직전에 음성으로 미리 코칭해 주는 Pleos Connect 앱입니다.
@@ -42,6 +46,10 @@ release APK 만들기: `./gradlew assembleRelease` → `app/build/outputs/apk/re
 ## 경로 데이터 출처
 
 - 시연 경로 좌표: [OSRM](https://project-osrm.org) 경로, © [OpenStreetMap contributors](https://www.openstreetmap.org/copyright)
+
+## 로고
+
+`docs/brand/`에 로고 원본(`logo.svg`)과 PNG(1024·512px, 가로형 밝은/어두운 배경)가 있습니다. 앱 아이콘은 `app/src/main/res/drawable/ic_logo.xml`(같은 그림의 벡터)입니다.
 
 ## 구조
 

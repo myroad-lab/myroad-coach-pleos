@@ -36,7 +36,7 @@ import com.myroad.coach.ui.DrivingCoachScreen
 import com.myroad.coach.ui.GrowthScreen
 import com.myroad.coach.ui.HabitScreen
 import com.myroad.coach.ui.HighlightScreen
-import com.myroad.coach.ui.MicIcon
+import com.myroad.coach.ui.SpeakerIcon
 import com.myroad.coach.ui.MoreMenu
 import com.myroad.coach.ui.PageNavigation
 import com.myroad.coach.ui.PleosColor
@@ -137,7 +137,7 @@ private fun AppRoot(
                     SuffixIcon(onClick = {
                         page = 2
                         engine.answerWeekly()
-                    }) { MicIcon() }
+                    }) { SpeakerIcon(PleosColor.text1, 40.dp) }
                     MoreMenu(
                         items = listOf(
                             "시연 시나리오 재생" to {

@@ -60,6 +60,7 @@ class TripRepository(context: Context) {
         put("distanceKm", t.distanceKm.toDouble())
         put("rainy", t.rainy)
         put("night", t.night)
+        put("isSample", t.isSample)
         put("passes", JSONObject().apply { t.passes.forEach { (k, v) -> put(k.name, v) } })
         put("moments", JSONArray().apply {
             t.moments.forEach { m ->
@@ -113,6 +114,8 @@ class TripRepository(context: Context) {
             night = o.getBoolean("night"),
             passes = passes,
             moments = moments,
+            // 이전 버전에 저장된 샘플 기록은 isSample 값이 없으므로 샘플 고유 번호(1,000,000 미만)로 구분
+            isSample = o.optBoolean("isSample", o.getLong("id") < 1_000_000L),
         )
     }
 

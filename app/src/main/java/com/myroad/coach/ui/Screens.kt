@@ -201,6 +201,7 @@ private fun TripMap(moments: List<RiskMoment>, summary: String, modifier: Modifi
         Row(Modifier.padding(24.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             val pill = RoundedCornerShape(999.dp)
             Chip(summary, bg = Color.White, modifier = with(PleosShadow) { Modifier.level1(pill) })
+            Chip("경로 예시", bg = Color.White, fg = PleosColor.text3, modifier = with(PleosShadow) { Modifier.level1(pill) })
             if (moments.any { it.rainy }) {
                 Chip("우천", bg = Color.White, fg = PleosColor.positive, modifier = with(PleosShadow) { Modifier.level1(pill) })
             }
@@ -224,6 +225,9 @@ private fun MomentList(state: CoachUiState, onJudge: (Int, Boolean) -> Unit, mod
             if (state.report.tripCount > 0) {
                 Text("최근 주행 평균 ${state.report.avgMomentsPerTrip}건", style = PleosType.bodyM.copy(color = PleosColor.text3))
             }
+        }
+        if (state.highlightIsSample) {
+            SampleBadge("예시 주행이에요 · ··· → 시연 시나리오 재생 후 실제 기록으로 바뀌어요")
         }
         Column(
             Modifier.weight(1f).verticalScroll(rememberScrollState()),
@@ -298,6 +302,12 @@ private fun Timeline(state: CoachUiState) {
     }
 }
 
+/** 시연용 샘플 데이터임을 알리는 배지 */
+@Composable
+fun SampleBadge(text: String = "시연용 샘플 기록 포함", modifier: Modifier = Modifier) {
+    Chip(text, bg = PleosColor.cautionSoft, fg = PleosColor.cautionText, modifier = modifier)
+}
+
 // ═══════════════════════════ 03 나의 운전 습관 ═══════════════════════════
 
 @Composable
@@ -314,6 +324,9 @@ fun HabitScreen(state: CoachUiState) {
                         "최근 4주 · ${r.totalKm.roundToInt()}km · ${r.tripCount}회 주행",
                         style = PleosType.bodyS.copy(color = PleosColor.text3),
                     )
+                }
+                if (r.sampleTripCount > 0) {
+                    SampleBadge("시연용 샘플 기록 ${r.sampleTripCount}회 포함 · ··· 메뉴에서 초기화")
                 }
                 if (!r.isEnough) {
                     SurfaceCard(Modifier.fillMaxWidth()) {
@@ -481,28 +494,27 @@ fun GrowthScreen(state: CoachUiState, onAsk: () -> Unit) {
                     Box(Modifier.size(18.dp).clip(RoundedCornerShape(5.dp)).background(PleosColor.text4))
                     Text(" 전체", style = PleosType.label)
                 }
+                if (r.sampleTripCount > 0) {
+                    Spacer(Modifier.height(12.dp))
+                    SampleBadge()
+                }
                 WeeklyChart(r.weekly, Modifier.fillMaxWidth().height(420.dp).padding(top = 20.dp))
                 Spacer(Modifier.weight(1f))
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                // 음성 '인식'은 아직 없으므로, 주간 요약을 음성으로 '들려주는' 기능으로 표시합니다.
+                val answer = state.assistantAnswer
+                if (answer != null) {
                     Row(
-                        Modifier.clip(RoundedCornerShape(28.dp)).background(Color.White).padding(horizontal = 28.dp, vertical = 20.dp),
+                        Modifier.clip(RoundedCornerShape(28.dp)).background(PleosColor.buttonFilled).padding(horizontal = 32.dp, vertical = 24.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        MicIcon(PleosColor.text2, 32.dp)
-                        Spacer(Modifier.width(12.dp))
-                        Text("“이번 주 어땠어?”", style = PleosType.bodyL)
+                        SpeakerIcon(Color.White, 40.dp)
+                        Spacer(Modifier.width(16.dp))
+                        Text(answer, style = PleosType.bodyL.copy(color = Color.White))
                     }
-                }
-                val answer = state.assistantAnswer
-                Spacer(Modifier.height(16.dp))
-                if (answer != null) {
-                    Text(
-                        answer,
-                        style = PleosType.bodyL.copy(color = Color.White),
-                        modifier = Modifier.clip(RoundedCornerShape(28.dp)).background(PleosColor.buttonFilled).padding(horizontal = 32.dp, vertical = 24.dp),
-                    )
+                    Spacer(Modifier.height(16.dp))
+                    PleosButton("다시 듣기", onClick = onAsk)
                 } else {
-                    PleosButton("마이크를 누르고 물어보기", filled = true, onClick = onAsk)
+                    PleosButton("이번 주 요약 듣기", filled = true, onClick = onAsk)
                 }
             }
         }

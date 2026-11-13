@@ -39,10 +39,9 @@ release APK 만들기: `./gradlew assembleRelease` → `app/build/outputs/apk/re
 
 선언한 권한: `CAR_DRIVE`, `CAR_LIGHTS`, `NAVI_ROUTE`, `FUSED_LOCATION`, `TTS_SERVICE`
 
-## 지도 데이터 출처
+## 경로 데이터 출처
 
-- 지도: © [OpenFreeMap](https://openfreemap.org) © [OpenMapTiles](https://openmaptiles.org) © [OpenStreetMap contributors](https://www.openstreetmap.org/copyright)
-- 시연 경로 좌표: [OSRM](https://project-osrm.org) 경로 (OpenStreetMap 데이터)
+- 시연 경로 좌표: [OSRM](https://project-osrm.org) 경로, © [OpenStreetMap contributors](https://www.openstreetmap.org/copyright)
 
 ## 구조
 
@@ -61,7 +60,7 @@ app/src/main/java/com/myroad/coach/
 ## 현재 한계
 
 - 처음 설치하면 시연용 4주치 샘플 기록(32회)으로 시작하며, 화면에 "시연용 샘플" 배지가 표시됩니다. ··· 메뉴에서 초기화할 수 있습니다.
-- 하이라이트 지도는 실제 지도(MapLibre + OpenFreeMap, OpenStreetMap 데이터)에 FusedLocation으로 기록한 경로와 위험 지점을 표시합니다. 지도를 불러올 인터넷 연결이 없거나 위치 기록이 없으면 도식 지도("경로 예시")로 대체됩니다.
+- 하이라이트는 인터넷 지도 없이, FusedLocation으로 기록한 좌표로 실제 도로 모양의 경로와 위험 지점을 그립니다. 위치 기록이 없으면 기본 곡선 위에 위험 지점을 배치합니다 ("경로 예시").
 - 시연 시나리오와 첫 화면 예시는 실제 도로 경로(판교 → 경부고속도로 → 양재IC → 강남, OSRM 경로 좌표)를 따라 재생됩니다 ("시연 경로" 표시).
 - 음성 인식(SpeechToText)은 아직 연동 전이며, 현재는 "이번 주 요약 듣기"로 분석 요약을 음성으로 들려줍니다.
 - Vehicle SDK에는 차량 속도 API가 없어, 급제동은 '감속 구간 직전 제동(늦은 감속)' 기준으로 판단합니다.

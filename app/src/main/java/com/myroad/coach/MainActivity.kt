@@ -25,6 +25,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.lifecycleScope
+import com.myroad.coach.data.TripRepository
 import com.myroad.coach.engine.CoachEngine
 import com.myroad.coach.engine.DriveState
 import com.myroad.coach.engine.ScenarioPlayer
@@ -53,7 +54,9 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         speaker = Speaker(this).also { it.initialize() }
-        engine = CoachEngine(speak = { speaker.speak(it) })
+        val trips = TripRepository(this)
+        engine = CoachEngine(speak = { speaker.speak(it) }, onHistoryChanged = { trips.save(it) })
+        engine.setHistory(trips.load())
         scenario = ScenarioPlayer(engine, lifecycleScope)
         live = LiveSources(this, engine).also { it.start() }
 
@@ -62,6 +65,7 @@ class MainActivity : ComponentActivity() {
                 AppRoot(
                     engine = engine,
                     onPlayScenario = { scenario.play() },
+                    onResetHistory = { engine.setHistory(trips.resetToSample()) },
                     sdkStatus = { live.status.map { (k, v) -> "$k · $v" } + "음성 · ${speaker.engineName}" },
                 )
             }
@@ -95,7 +99,12 @@ private fun PleosAppTheme(content: @Composable () -> Unit) {
 private val PAGES = listOf("오늘의 하이라이트", "나의 운전 습관", "성장 리포트")
 
 @Composable
-private fun AppRoot(engine: CoachEngine, onPlayScenario: () -> Unit, sdkStatus: () -> List<String>) {
+private fun AppRoot(
+    engine: CoachEngine,
+    onPlayScenario: () -> Unit,
+    onResetHistory: () -> Unit,
+    sdkStatus: () -> List<String>,
+) {
     val state by engine.state.collectAsState()
     var page by remember { mutableIntStateOf(0) }
     var toast by remember { mutableStateOf<String?>(null) }
@@ -134,6 +143,10 @@ private fun AppRoot(engine: CoachEngine, onPlayScenario: () -> Unit, sdkStatus: 
                             "시연 시나리오 재생" to {
                                 onPlayScenario()
                                 toast = "출근길 시나리오를 재생해요"
+                            },
+                            "주행 기록을 샘플로 초기화" to {
+                                onResetHistory()
+                                toast = "주행 기록을 시연용 샘플로 되돌렸어요"
                             },
                         ),
                         footer = sdkStatus(),

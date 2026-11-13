@@ -28,8 +28,9 @@ class ScenarioPlayer(private val engine: CoachEngine, private val scope: Corouti
             var minute = 31
             engine.clockOverride = { "08:%02d".format(minute.coerceAtMost(59)) }
             engine.setSource("시나리오 재생")
-            engine.onConditions(rainy = true, night = false)
             engine.onDriveState(true)
+            engine.onConditions(rainy = true, night = false)
+            engine.onTripDistance(24.6f)
             delay(tick * 4)
 
             // ── 합류 구간 ──
@@ -62,7 +63,9 @@ class ScenarioPlayer(private val engine: CoachEngine, private val scope: Corouti
             minute = 2 + 60 // 09:02 표시용
             engine.clockOverride = { "09:%02d".format(minute - 60) }
             engine.onCautionPoint(RoadType.SCHOOL_ZONE, 150)
-            delay(tick * 2)
+            delay(tick)
+            engine.onCautionPoint(RoadType.SCHOOL_ZONE, 20)
+            delay(tick)
             engine.onCameraAlert(overSpeed = true, speedLimit = 30, inSchoolZone = true)
             delay(tick * 4)
 

@@ -36,6 +36,9 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.myroad.coach.data.Judgement
+import com.myroad.coach.data.HabitAnalyzer
+import com.myroad.coach.data.WeeklyPoint
+import kotlin.math.roundToInt
 import com.myroad.coach.data.MomentKind
 import com.myroad.coach.data.RiskMoment
 import com.myroad.coach.data.SampleData
@@ -218,7 +221,9 @@ private fun MomentList(state: CoachUiState, onJudge: (Int, Boolean) -> Unit, mod
                 style = PleosType.headlineS,
             )
             Spacer(Modifier.width(20.dp))
-            Text(SampleData.averageMoments, style = PleosType.bodyM.copy(color = PleosColor.text3))
+            if (state.report.tripCount > 0) {
+                Text("최근 주행 평균 ${state.report.avgMomentsPerTrip}건", style = PleosType.bodyM.copy(color = PleosColor.text3))
+            }
         }
         Column(
             Modifier.weight(1f).verticalScroll(rememberScrollState()),
@@ -297,7 +302,7 @@ private fun Timeline(state: CoachUiState) {
 
 @Composable
 fun HabitScreen(state: CoachUiState) {
-    val excluded = state.moments.count { it.judgement == Judgement.EXCLUDED_BY_DRIVER }
+    val r = state.report
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val wide = maxWidth >= 1100.dp
         val habits: @Composable (Modifier) -> Unit = { mod ->
@@ -305,9 +310,24 @@ fun HabitScreen(state: CoachUiState) {
                 Row(verticalAlignment = Alignment.Bottom) {
                     Text("나의 대표 습관", style = PleosType.headlineS.copy(fontSize = 44.sp))
                     Spacer(Modifier.width(18.dp))
-                    Text("최근 4주 · 612km · 31회 주행", style = PleosType.bodyS.copy(color = PleosColor.text3))
+                    Text(
+                        "최근 4주 · ${r.totalKm.roundToInt()}km · ${r.tripCount}회 주행",
+                        style = PleosType.bodyS.copy(color = PleosColor.text3),
+                    )
                 }
-                SampleData.habits.forEachIndexed { i, h ->
+                if (!r.isEnough) {
+                    SurfaceCard(Modifier.fillMaxWidth()) {
+                        Text(
+                            "아직 분석 중이에요. ${HabitAnalyzer.MIN_KM_FOR_HABIT.roundToInt()}km 이상 주행하면\n나의 운전 습관을 알려 드릴게요.",
+                            style = PleosType.titleS,
+                        )
+                    }
+                } else if (r.habits.isEmpty()) {
+                    SurfaceCard(Modifier.fillMaxWidth(), bg = PleosColor.activeSoft) {
+                        Text("기준을 넘는 나쁜 습관이 없어요.\n지금처럼 운전해 주세요!", style = PleosType.titleS)
+                    }
+                }
+                r.habits.forEachIndexed { i, h ->
                     SurfaceCard(Modifier.fillMaxWidth()) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text("${i + 1}", style = PleosType.headlineS.copy(color = PleosColor.caution), modifier = Modifier.width(52.dp))
@@ -329,8 +349,8 @@ fun HabitScreen(state: CoachUiState) {
                         }
                     }
                 }
-                if (excluded > 0) {
-                    Text("돌발 상황으로 표시한 기록 ${excluded}건은 분석에서 제외했어요", style = PleosType.caption)
+                if (r.excludedCount > 0) {
+                    Text("돌발 상황으로 표시한 기록 ${r.excludedCount}건은 분석에서 제외했어요", style = PleosType.caption)
                 }
             }
         }
@@ -341,29 +361,38 @@ fun HabitScreen(state: CoachUiState) {
                         Text("약점 도로 유형", style = PleosType.titleM)
                         Text("위험 순간 비율 · 나의 평균 대비", style = PleosType.label.copy(color = PleosColor.text3))
                         Spacer(Modifier.height(30.dp))
-                        val max = SampleData.weakRoads.maxOf { it.ratio }
-                        SampleData.weakRoads.forEach { r ->
+                        val max = (r.weakRoads.maxOfOrNull { it.ratio } ?: 1f).coerceAtLeast(0.1f)
+                        if (r.weakRoads.isEmpty()) {
+                            Text("도로 유형별로 5번 이상 지나가면 보여 드릴게요", style = PleosType.bodyS.copy(color = PleosColor.text3))
+                        }
+                        r.weakRoads.forEach { wr ->
                             Row(Modifier.padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Text(r.type.label, style = PleosType.bodyL, modifier = Modifier.width(190.dp))
+                                Text(wr.type.label, style = PleosType.bodyL, modifier = Modifier.width(190.dp))
                                 Box(Modifier.weight(1f).height(24.dp).clip(RoundedCornerShape(12.dp)).background(Color.White)) {
                                     Box(
-                                        Modifier.fillMaxWidth(r.ratio / max).fillMaxHeight().clip(RoundedCornerShape(12.dp))
-                                            .background(if (r.ratio >= 1.5f) PleosColor.caution else PleosColor.text4),
+                                        Modifier.fillMaxWidth((wr.ratio / max).coerceIn(0.02f, 1f)).fillMaxHeight().clip(RoundedCornerShape(12.dp))
+                                            .background(if (wr.ratio >= HabitAnalyzer.WEAK_RATIO) PleosColor.caution else PleosColor.text4),
                                     )
                                 }
-                                Text("${r.ratio}×", style = PleosType.bodyL.copy(fontWeight = FontWeight.Bold), modifier = Modifier.padding(start = 18.dp).width(80.dp))
+                                Text("${wr.ratio}×", style = PleosType.bodyL.copy(fontWeight = FontWeight.Bold), modifier = Modifier.padding(start = 18.dp).width(80.dp))
                             }
                         }
                     }
                 }
-                SurfaceCard(Modifier.fillMaxWidth()) {
-                    Column {
-                        Text("조건별 위험 순간", style = PleosType.titleS)
-                        Spacer(Modifier.height(16.dp))
-                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Chip(SampleData.conditions[0], bg = PleosColor.positiveSoft, fg = PleosColor.positive)
-                            Chip(SampleData.conditions[1], bg = PleosColor.autonomousSoft, fg = PleosColor.autonomous)
-                            Chip(SampleData.conditions[2], bg = Color.White)
+                if (r.conditions.isNotEmpty()) {
+                    SurfaceCard(Modifier.fillMaxWidth()) {
+                        Column {
+                            Text("조건별 위험 순간", style = PleosType.titleS)
+                            Spacer(Modifier.height(16.dp))
+                            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                r.conditions.forEach { c ->
+                                    when {
+                                        c.startsWith("비") -> Chip(c, bg = PleosColor.positiveSoft, fg = PleosColor.positive)
+                                        c.startsWith("야간") -> Chip(c, bg = PleosColor.autonomousSoft, fg = PleosColor.autonomous)
+                                        else -> Chip(c, bg = Color.White)
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -387,24 +416,45 @@ fun HabitScreen(state: CoachUiState) {
 
 @Composable
 fun GrowthScreen(state: CoachUiState, onAsk: () -> Unit) {
+    val r = state.report
+    val green = Color(0xFF03914C)
+    val focusName = r.focusType?.label?.substringBefore('·')
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val wide = maxWidth >= 1100.dp
         val stats: @Composable (Modifier) -> Unit = { mod ->
             Column(mod, verticalArrangement = Arrangement.spacedBy(24.dp)) {
-                SurfaceCard(Modifier.fillMaxWidth(), bg = PleosColor.activeSoft) {
+                val change = r.focusChangePercent
+                SurfaceCard(Modifier.fillMaxWidth(), bg = if (change != null && change > 0) PleosColor.activeSoft else PleosColor.surface) {
                     Column {
-                        Text("합류 구간 급제동", style = PleosType.bodyM.copy(color = PleosColor.text2))
-                        Text("40% ↓", style = PleosType.headlineS.copy(fontSize = 96.sp, lineHeight = 110.sp, color = Color(0xFF03914C)))
-                        Text("지난주보다 줄었어요 · 코칭 12회", style = PleosType.bodyM.copy(color = PleosColor.text2))
+                        Text("${focusName ?: "전체"} 구간 급제동", style = PleosType.bodyM.copy(color = PleosColor.text2))
+                        Text(
+                            when {
+                                change == null -> "—"
+                                change >= 0 -> "$change% ↓"
+                                else -> "${-change}% ↑"
+                            },
+                            style = PleosType.headlineS.copy(
+                                fontSize = 96.sp, lineHeight = 110.sp,
+                                color = if (change != null && change > 0) green else PleosColor.text1,
+                            ),
+                        )
+                        Text("지난주와 비교했어요", style = PleosType.bodyM.copy(color = PleosColor.text2))
                     }
                 }
                 SurfaceCard(Modifier.fillMaxWidth()) {
                     Column {
                         Text("방향지시등 사용률 (회전·분기)", style = PleosType.bodyM.copy(color = PleosColor.text2))
                         Row(verticalAlignment = Alignment.Bottom) {
-                            Text("78%", style = PleosType.headlineS.copy(fontSize = 72.sp, lineHeight = 86.sp))
-                            Spacer(Modifier.width(14.dp))
-                            Text("+16%p", style = PleosType.titleS.copy(color = Color(0xFF03914C)), modifier = Modifier.padding(bottom = 12.dp))
+                            Text(r.signalUseRate?.let { "$it%" } ?: "—", style = PleosType.headlineS.copy(fontSize = 72.sp, lineHeight = 86.sp))
+                            val d = r.signalUseDelta
+                            if (d != null && d != 0) {
+                                Spacer(Modifier.width(14.dp))
+                                Text(
+                                    (if (d > 0) "+" else "") + "${d}%p",
+                                    style = PleosType.titleS.copy(color = if (d > 0) green else PleosColor.negative),
+                                    modifier = Modifier.padding(bottom = 12.dp),
+                                )
+                            }
                         }
                     }
                 }
@@ -412,9 +462,12 @@ fun GrowthScreen(state: CoachUiState, onAsk: () -> Unit) {
                     Column {
                         Chip("다음 코칭 목표", bg = Color.White, fg = PleosColor.cautionText)
                         Spacer(Modifier.height(20.dp))
-                        Text("비 오는 날 회전교차로", style = PleosType.titleL)
+                        Text(r.nextTarget ?: (r.focusType?.label ?: "분석 중"), style = PleosType.titleL)
                         Spacer(Modifier.height(8.dp))
-                        Text("합류 구간이 좋아져서\n다음 약점으로 바꿨어요", style = PleosType.bodyS.copy(color = PleosColor.text3))
+                        Text(
+                            if (r.nextTarget != null) "$focusName 구간이 좋아져서\n다음 약점을 함께 연습해요" else "지금 약점 구간을 계속 코칭할게요",
+                            style = PleosType.bodyS.copy(color = PleosColor.text3),
+                        )
                     }
                 }
             }
@@ -424,11 +477,11 @@ fun GrowthScreen(state: CoachUiState, onAsk: () -> Unit) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text("100km당 급제동 · 최근 4주", style = PleosType.titleM, modifier = Modifier.weight(1f))
                     Box(Modifier.size(18.dp).clip(RoundedCornerShape(5.dp)).background(PleosColor.caution))
-                    Text(" 합류 구간   ", style = PleosType.label)
+                    Text(" ${focusName ?: "약점"} 구간   ", style = PleosType.label)
                     Box(Modifier.size(18.dp).clip(RoundedCornerShape(5.dp)).background(PleosColor.text4))
                     Text(" 전체", style = PleosType.label)
                 }
-                WeeklyChart(Modifier.fillMaxWidth().height(420.dp).padding(top = 20.dp))
+                WeeklyChart(r.weekly, Modifier.fillMaxWidth().height(420.dp).padding(top = 20.dp))
                 Spacer(Modifier.weight(1f))
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                     Row(
@@ -441,15 +494,14 @@ fun GrowthScreen(state: CoachUiState, onAsk: () -> Unit) {
                     }
                 }
                 val answer = state.assistantAnswer
+                Spacer(Modifier.height(16.dp))
                 if (answer != null) {
-                    Spacer(Modifier.height(16.dp))
                     Text(
                         answer,
                         style = PleosType.bodyL.copy(color = Color.White),
                         modifier = Modifier.clip(RoundedCornerShape(28.dp)).background(PleosColor.buttonFilled).padding(horizontal = 32.dp, vertical = 24.dp),
                     )
                 } else {
-                    Spacer(Modifier.height(16.dp))
                     PleosButton("마이크를 누르고 물어보기", filled = true, onClick = onAsk)
                 }
             }
@@ -469,28 +521,39 @@ fun GrowthScreen(state: CoachUiState, onAsk: () -> Unit) {
 }
 
 @Composable
-private fun WeeklyChart(modifier: Modifier) {
-    val data = SampleData.weekly
+private fun WeeklyChart(data: List<WeeklyPoint>, modifier: Modifier) {
+    if (data.size < 2) return
+    val top = data.maxOf { maxOf(it.merge, it.overall) }
+    // 눈금: 2 단위로 올림 (최소 6)
+    val maxV = (kotlin.math.ceil(top / 2.0) * 2).toFloat().coerceAtLeast(6f)
     Box(modifier) {
         Canvas(Modifier.fillMaxSize().padding(start = 40.dp, bottom = 40.dp, top = 30.dp, end = 30.dp)) {
             val w = size.width
             val h = size.height
-            val maxV = 6f
-            for (g in 0..3) {
+            val steps = (maxV / 2).toInt()
+            for (g in 0..steps) {
                 val y = h - h * (g * 2f / maxV)
                 drawLine(Color(0xFFE1E3E7), Offset(0f, y), Offset(w, y), strokeWidth = 2f)
             }
             fun pt(i: Int, v: Float) = Offset(w * (0.08f + 0.84f * i / (data.size - 1)), h - h * (v / maxV))
-            val overall = Path().apply { data.forEachIndexed { i, d -> if (i == 0) moveTo(pt(i, d.overall).x, pt(i, d.overall).y) else lineTo(pt(i, d.overall).x, pt(i, d.overall).y) } }
-            val merge = Path().apply { data.forEachIndexed { i, d -> if (i == 0) moveTo(pt(i, d.merge).x, pt(i, d.merge).y) else lineTo(pt(i, d.merge).x, pt(i, d.merge).y) } }
+            val overall = Path()
+            val focus = Path()
+            data.forEachIndexed { i, d ->
+                val a = pt(i, d.overall)
+                val b = pt(i, d.merge)
+                if (i == 0) {
+                    overall.moveTo(a.x, a.y); focus.moveTo(b.x, b.y)
+                } else {
+                    overall.lineTo(a.x, a.y); focus.lineTo(b.x, b.y)
+                }
+            }
             drawPath(overall, PleosColor.text4, style = Stroke(6f, cap = StrokeCap.Round, join = StrokeJoin.Round))
-            drawPath(merge, PleosColor.caution, style = Stroke(8f, cap = StrokeCap.Round, join = StrokeJoin.Round))
+            drawPath(focus, PleosColor.caution, style = Stroke(8f, cap = StrokeCap.Round, join = StrokeJoin.Round))
             data.forEachIndexed { i, d ->
                 drawCircle(PleosColor.text4, 9f, pt(i, d.overall))
                 drawCircle(PleosColor.caution, if (i == data.lastIndex) 14f else 11f, pt(i, d.merge))
             }
         }
-        // 축 라벨
         Row(Modifier.align(Alignment.BottomStart).fillMaxWidth().padding(start = 40.dp, end = 30.dp), horizontalArrangement = Arrangement.SpaceAround) {
             data.forEach { Text(it.label, style = PleosType.label) }
         }

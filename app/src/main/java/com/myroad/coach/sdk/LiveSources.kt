@@ -1,5 +1,8 @@
 package com.myroad.coach.sdk
 
+import ai.pleos.playground.location.fused.FusedLocation
+import ai.pleos.playground.location.fused.listener.FusedLocationListener
+import ai.pleos.playground.location.fused.model.LocationData
 import ai.pleos.playground.navi.constants.CameraType
 import ai.pleos.playground.navi.constants.CautionPointType
 import ai.pleos.playground.navi.data.CameraAlert
@@ -26,6 +29,7 @@ import com.myroad.coach.engine.SignalSide
  * 실차(또는 에뮬레이터 버추얼 콘솔) 신호를 CoachEngine으로 전달합니다.
  * - Vehicle SDK: 브레이크 페달, 기어, 조향각, 방향지시등
  * - NaviHelper SDK: 회전 안내(TBT), 주의 구간, 단속 카메라, 목적지 도착
+ * - FusedLocation SDK: 위치 (주행 경로, 위험 순간 위치, 주행 거리)
  * SDK 콜백은 IPC 스레드에서 올 수 있으므로 메인 스레드로 옮겨서 처리합니다.
  * 지원되지 않는 항목은 onFailed로 알려 오며, 해당 기능만 꺼진 채로 앱은 계속 동작합니다.
  */
@@ -35,6 +39,7 @@ class LiveSources(context: Context, private val engine: CoachEngine) {
     private val main = Handler(Looper.getMainLooper())
     private var vehicle: Vehicle? = null
     private var navi: NaviHelper? = null
+    private var fused: FusedLocation? = null
 
     /** 연결 결과를 사람이 읽을 수 있게 모아 둡니다 (설정 화면/로그용). */
     val status = linkedMapOf<String, String>()
@@ -75,6 +80,14 @@ class LiveSources(context: Context, private val engine: CoachEngine) {
             )
         }
         override fun onFailed(p0: Exception) = fail("방향지시등", p0)
+    }
+
+    private val locationListener = object : FusedLocationListener {
+        override fun onChanged(p0: LocationData?) {
+            val loc = p0 ?: return
+            ui { engine.onLocation(loc.latitude, loc.longitude) }
+        }
+        override fun onError(p0: Exception) = fail("위치", p0)
     }
 
     private val naviListener = object : NaviHelperEventListener {
@@ -122,6 +135,16 @@ class LiveSources(context: Context, private val engine: CoachEngine) {
         } catch (e: Throwable) {
             fail("NaviHelper SDK", e)
         }
+        try {
+            val f = FusedLocation(appContext)
+            f.initialize()
+            // 초기화 직후에는 지원 여부가 아직 확정되지 않을 수 있어 항상 등록하고, 상태만 표시합니다.
+            f.registerFusedLocationCallback(locationListener)
+            status["FusedLocation SDK"] = if (runCatching { f.isSupported() }.getOrDefault(true)) "연결" else "미지원"
+            fused = f
+        } catch (e: Throwable) {
+            fail("FusedLocation SDK", e)
+        }
     }
 
     fun stop() {
@@ -136,8 +159,13 @@ class LiveSources(context: Context, private val engine: CoachEngine) {
             runCatching { n.removeListener(naviListener) }
             runCatching { n.release() }
         }
+        fused?.let { f ->
+            runCatching { f.unregisterFusedLocationCallback(locationListener) }
+            runCatching { f.release() }
+        }
         vehicle = null
         navi = null
+        fused = null
     }
 
     private fun fail(what: String, e: Throwable?) {

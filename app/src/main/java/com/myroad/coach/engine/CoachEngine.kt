@@ -1,6 +1,7 @@
 package com.myroad.coach.engine
 
 import com.myroad.coach.data.CoachingCard
+import com.myroad.coach.data.GeoPoint
 import com.myroad.coach.data.HabitAnalyzer
 import com.myroad.coach.data.HabitReport
 import com.myroad.coach.data.TripRecord
@@ -47,6 +48,8 @@ data class CoachUiState(
     val requestHighlightTab: Long = 0L,
     /** 첫 주행이 끝나기 전 하이라이트에 보여 주는 예시 데이터인지 */
     val highlightIsSample: Boolean = true,
+    /** 하이라이트 지도에 그릴 최근 주행 경로 */
+    val route: List<GeoPoint> = SampleData.route,
     val report: HabitReport = HabitAnalyzer.analyze(emptyList()),
 )
 
@@ -79,6 +82,9 @@ class CoachEngine(
     private var tripStartMillis = 0L
     private var tripPasses = mutableMapOf<RoadType, Int>()
     private var tripDistanceKm = 0f
+    private var tripRoute = mutableListOf<GeoPoint>()
+    private var lastLocation: GeoPoint? = null
+    private var locationDistanceM = 0.0
     private var tripRainy = false
     private var tripNight = false
     private var lastCautionCounted: RoadType? = null
@@ -105,9 +111,21 @@ class CoachEngine(
         if (notify) onHistoryChanged(history)
     }
 
-    /** 이번 주행 거리 (Odometer / 위치 누적 / 시나리오에서 입력) */
+    /** 이번 주행 거리를 직접 지정 (주행거리계 등). 지정하지 않으면 위치 이동 거리를 씁니다. */
     fun onTripDistance(km: Float) {
         tripDistanceKm = km
+    }
+
+    /** FusedLocation SDK (또는 시나리오)에서 받은 위치 */
+    fun onLocation(lat: Double, lng: Double) {
+        val p = GeoPoint(lat, lng)
+        val prev = lastLocation
+        lastLocation = p
+        if (_state.value.driveState != DriveState.DRIVING) return
+        if (prev != null) locationDistanceM += distanceMeters(prev, p)
+        val lastKept = tripRoute.lastOrNull()
+        // 경로는 약 20m 간격으로만 저장 (저장 용량과 지도 그리기 부담을 줄임)
+        if (lastKept == null || distanceMeters(lastKept, p) >= ROUTE_STEP_METERS) tripRoute += p
     }
 
     var clockOverride: (() -> String)? = null
@@ -125,6 +143,8 @@ class CoachEngine(
             tripStartMillis = System.currentTimeMillis()
             tripPasses = mutableMapOf()
             tripDistanceKm = 0f
+            tripRoute = mutableListOf()
+            locationDistanceM = 0.0
             tripRainy = false
             tripNight = false
             _state.update { it.copy(driveState = DriveState.DRIVING, coaching = null, coachedCount = 0) }
@@ -239,9 +259,11 @@ class CoachEngine(
     private fun record(kind: MomentKind, type: RoadType, cause: String) {
         val pos = MAP_SLOTS[tripMoments.size % MAP_SLOTS.size]
         val s = _state.value.signals
+        val here = lastLocation
         tripMoments += RiskMoment(
             id = nextId++, time = now(), kind = kind, roadType = type,
             rainy = s.rainy, night = s.night, cause = cause, mapX = pos.first, mapY = pos.second,
+            lat = here?.lat, lng = here?.lng,
             judgement = if (type in DECELERATION_TYPES || kind != MomentKind.HARD_BRAKE) Judgement.HABIT_SUSPECTED
             else Judgement.PENDING,
         )
@@ -250,6 +272,9 @@ class CoachEngine(
     private fun finishTrip() {
         closeManeuver()
         val end = now()
+        lastLocation?.let { if (tripRoute.lastOrNull() != it) tripRoute += it }
+        val km = if (tripDistanceKm > 0f) tripDistanceKm else (locationDistanceM / 1000.0).toFloat()
+        tripDistanceKm = km
         val record = TripRecord(
             id = System.currentTimeMillis(),
             startedAt = tripStartMillis,
@@ -260,6 +285,7 @@ class CoachEngine(
             night = tripNight,
             passes = tripPasses.toMap(),
             moments = tripMoments.toList(),
+            route = simplify(tripRoute, MAX_ROUTE_POINTS),
         )
         history = history + record
         _state.update {
@@ -269,6 +295,7 @@ class CoachEngine(
                 next = null,
                 moments = record.moments,
                 highlightIsSample = false,
+                route = record.route,
                 tripSummary = if (tripDistanceKm > 0f) "최근 주행 · ${"%.1f".format(Locale.US, tripDistanceKm)}km" else "최근 주행",
                 tripStart = record.startLabel,
                 tripEnd = end,
@@ -330,6 +357,26 @@ class CoachEngine(
     companion object {
         const val LATE_BRAKE_METERS = 50
         const val PASS_METERS = 30
+        const val ROUTE_STEP_METERS = 20.0
+        const val MAX_ROUTE_POINTS = 400
+
+        /** 두 좌표 사이 거리 (m, 하버사인) */
+        fun distanceMeters(a: GeoPoint, b: GeoPoint): Double {
+            val r = 6_371_000.0
+            val dLat = Math.toRadians(b.lat - a.lat)
+            val dLng = Math.toRadians(b.lng - a.lng)
+            val h = kotlin.math.sin(dLat / 2).let { it * it } +
+                kotlin.math.cos(Math.toRadians(a.lat)) * kotlin.math.cos(Math.toRadians(b.lat)) *
+                kotlin.math.sin(dLng / 2).let { it * it }
+            return 2 * r * kotlin.math.asin(kotlin.math.sqrt(h))
+        }
+
+        /** 점이 너무 많으면 일정 간격으로 솎아 냄 (처음과 끝은 유지) */
+        fun simplify(points: List<GeoPoint>, max: Int): List<GeoPoint> {
+            if (points.size <= max) return points.toList()
+            val step = points.size.toDouble() / (max - 1)
+            return (0 until max - 1).map { points[(it * step).toInt()] } + points.last()
+        }
         const val SIGNAL_WINDOW_METERS = 100
         const val TURN_STEER_DEGREES = 30f
         val DECELERATION_TYPES = setOf(

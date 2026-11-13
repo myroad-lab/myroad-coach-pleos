@@ -20,6 +20,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -137,12 +141,12 @@ fun HighlightScreen(state: CoachUiState, onJudge: (Int, Boolean) -> Unit) {
         val wide = maxWidth >= 1100.dp
         if (wide) {
             Row(Modifier.fillMaxSize().padding(36.dp), horizontalArrangement = Arrangement.spacedBy(36.dp)) {
-                TripMap(state.moments, state.tripSummary, Modifier.width(620.dp).fillMaxHeight())
+                TripMapCard(state, Modifier.width(620.dp).fillMaxHeight())
                 MomentList(state, onJudge, Modifier.weight(1f).fillMaxHeight())
             }
         } else {
             Column(Modifier.fillMaxSize().padding(32.dp), verticalArrangement = Arrangement.spacedBy(24.dp)) {
-                TripMap(state.moments, state.tripSummary, Modifier.fillMaxWidth().height(380.dp))
+                TripMapCard(state, Modifier.fillMaxWidth().height(380.dp))
                 MomentList(state, onJudge, Modifier.weight(1f))
             }
         }
@@ -157,7 +161,38 @@ private fun momentColor(kind: MomentKind) = when (kind) {
 }
 
 @Composable
-private fun TripMap(moments: List<RiskMoment>, summary: String, modifier: Modifier) {
+private fun TripMapCard(state: CoachUiState, modifier: Modifier) {
+    val hasLocation = state.route.size >= 2 || state.moments.any { it.lat != null }
+    var mapFailed by remember { mutableStateOf(false) }
+    val useRealMap = hasLocation && !mapFailed
+    Box(modifier.clip(CardShape).background(Color(0xFFEEF1EC))) {
+        if (useRealMap) {
+            RealTripMap(
+                route = state.route,
+                moments = state.moments,
+                modifier = Modifier.fillMaxSize(),
+                onLoadFailed = { mapFailed = true },
+            )
+        } else {
+            SchematicMap(state.moments, Modifier.fillMaxSize())
+        }
+        Row(Modifier.padding(24.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            val pill = RoundedCornerShape(999.dp)
+            Chip(state.tripSummary, bg = Color.White, modifier = with(PleosShadow) { Modifier.level1(pill) })
+            when {
+                !useRealMap -> Chip("경로 예시", bg = Color.White, fg = PleosColor.text3, modifier = with(PleosShadow) { Modifier.level1(pill) })
+                state.highlightIsSample -> Chip("시연 경로", bg = Color.White, fg = PleosColor.text3, modifier = with(PleosShadow) { Modifier.level1(pill) })
+            }
+            if (state.moments.any { it.rainy }) {
+                Chip("우천", bg = Color.White, fg = PleosColor.positive, modifier = with(PleosShadow) { Modifier.level1(pill) })
+            }
+        }
+    }
+}
+
+/** 위치 정보가 없거나 지도를 불러오지 못할 때 쓰는 도식 지도 */
+@Composable
+private fun SchematicMap(moments: List<RiskMoment>, modifier: Modifier) {
     Box(modifier.clip(CardShape).background(Color(0xFFEEF1EC))) {
         Canvas(Modifier.fillMaxSize()) {
             val w = size.width
@@ -196,14 +231,6 @@ private fun TripMap(moments: List<RiskMoment>, summary: String, modifier: Modifi
                 ) {
                     Text("${i + 1}", style = PleosType.label.copy(color = Color.White, fontWeight = FontWeight.ExtraBold))
                 }
-            }
-        }
-        Row(Modifier.padding(24.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            val pill = RoundedCornerShape(999.dp)
-            Chip(summary, bg = Color.White, modifier = with(PleosShadow) { Modifier.level1(pill) })
-            Chip("경로 예시", bg = Color.White, fg = PleosColor.text3, modifier = with(PleosShadow) { Modifier.level1(pill) })
-            if (moments.any { it.rainy }) {
-                Chip("우천", bg = Color.White, fg = PleosColor.positive, modifier = with(PleosShadow) { Modifier.level1(pill) })
             }
         }
     }

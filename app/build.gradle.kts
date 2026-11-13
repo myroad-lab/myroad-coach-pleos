@@ -60,6 +60,9 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.6")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
 
+    // 하이라이트 지도: MapLibre (오픈소스) + OpenFreeMap 지도 타일 (API 키 불필요)
+    implementation("org.maplibre.gl:android-sdk:11.8.8")
+
     // 판단 로직(CoachEngine) 단위 테스트: ./gradlew test
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit:2.0.21")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")

@@ -171,7 +171,7 @@ fun PageNavigation(
             Box(Modifier.size(72.dp).pleosPress(onBack), contentAlignment = Alignment.Center) { BackIcon() }
             Spacer(Modifier.width(12.dp))
         } else {
-            Box(with(PleosShadow) { Modifier.level1(RoundedCornerShape(18.dp)) }) { AppMark(68.dp) }
+            Box(with(PleosShadow) { Modifier.level1(RoundedCornerShape(16.dp)) }) { AppMark(68.dp) }
             Spacer(Modifier.width(28.dp))
         }
         Box {

@@ -1,5 +1,6 @@
 package com.myroad.coach.ui
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -27,6 +28,8 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.painterResource
+import com.myroad.coach.R
 
 val CardShape = RoundedCornerShape(28.dp)
 
@@ -84,27 +87,14 @@ fun NumberBadge(n: Int, color: Color, size: Dp = 52.dp) {
     }
 }
 
-/** 앱 아이콘 (그라데이션 사각형 + 경로 선) */
+/** 앱 로고 (A 시안: 굽은 길 + 약점 구간 + 음성 코칭). res/drawable/ic_logo.xml */
 @Composable
 fun AppMark(size: Dp = 60.dp) {
-    Box(
-        Modifier
-            .size(size)
-            .clip(RoundedCornerShape(size * 0.27f))
-            .background(Brush.linearGradient(listOf(PleosColor.active, PleosColor.positive))),
-        contentAlignment = Alignment.Center,
-    ) {
-        Canvas(Modifier.size(size * 0.56f)) {
-            val cw = this.size.width
-            val ch = this.size.height
-            val p = Path()
-            p.moveTo(0f, ch * 0.9f)
-            p.lineTo(cw * 0.32f, ch * 0.1f)
-            p.lineTo(cw * 0.58f, ch * 0.62f)
-            p.lineTo(cw, ch * 0.08f)
-            drawPath(p, Color.White, style = Stroke(width = cw * 0.14f, cap = StrokeCap.Round, join = StrokeJoin.Round))
-        }
-    }
+    Image(
+        painter = painterResource(R.drawable.ic_logo),
+        contentDescription = "마이로드 코치",
+        modifier = Modifier.size(size),
+    )
 }
 
 /** 세그먼트 메뉴 (Pleos segmented menu 컴포넌트 형태) */

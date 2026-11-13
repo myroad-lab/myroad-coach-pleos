@@ -45,6 +45,8 @@ data class CoachUiState(
     val coachedCount: Int = 0,
     val assistantAnswer: String? = null,
     val requestHighlightTab: Long = 0L,
+    /** 첫 주행이 끝나기 전 하이라이트에 보여 주는 예시 데이터인지 */
+    val highlightIsSample: Boolean = true,
     val report: HabitReport = HabitAnalyzer.analyze(emptyList()),
 )
 
@@ -266,6 +268,7 @@ class CoachEngine(
                 coaching = null,
                 next = null,
                 moments = record.moments,
+                highlightIsSample = false,
                 tripSummary = if (tripDistanceKm > 0f) "최근 주행 · ${"%.1f".format(Locale.US, tripDistanceKm)}km" else "최근 주행",
                 tripStart = record.startLabel,
                 tripEnd = end,

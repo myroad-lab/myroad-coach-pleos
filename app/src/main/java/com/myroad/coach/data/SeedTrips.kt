@@ -68,6 +68,7 @@ object SeedTrips {
                     rainy = rainy[t], night = night[t],
                     passes = passesPerTrip + roundabout + sharp,
                     moments = buckets[t],
+                    isSample = true,
                 )
             }
         }

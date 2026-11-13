@@ -16,6 +16,8 @@ data class TripRecord(
     /** 도로 유형별 통과 횟수 (위험 비율의 분모) */
     val passes: Map<RoadType, Int>,
     val moments: List<RiskMoment>,
+    /** 시연용 샘플 기록이면 true (화면에 '시연용 샘플' 표시) */
+    val isSample: Boolean = false,
 )
 
 data class HabitReport(
@@ -35,6 +37,7 @@ data class HabitReport(
     val excludedCount: Int,
     val totalKm: Float,
     val tripCount: Int,
+    val sampleTripCount: Int,
     val isEnough: Boolean,
     val avgMomentsPerTrip: Float,
 )
@@ -207,6 +210,7 @@ object HabitAnalyzer {
             excludedCount = excluded,
             totalKm = totalKm,
             tripCount = trips.size,
+            sampleTripCount = trips.count { it.isSample },
             isEnough = totalKm >= MIN_KM_FOR_HABIT,
             avgMomentsPerTrip = if (trips.isEmpty()) 0f else round1(moments.size.toFloat() / trips.size),
         )

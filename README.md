@@ -4,22 +4,35 @@
 
 # 마이로드 코치 (MyRoad Coach)
 
+**팀 MyRoad LAB** · 2026 현대자동차그룹 차량용 앱 개발 공모전 출품작
+
+> 내 운전 습관이 나오는 길, 들어서기 전에 미리 코칭하는 Pleos Connect 앱
+
+- **APK**: [`apk/MyRoadLAB_MyRoadCoach_release.apk`](apk/MyRoadLAB_MyRoadCoach_release.apk) (release 빌드)
+- **시연 영상**: https://drive.google.com/file/d/1mulReaiLqzBK37KZ4MdUERVUChzVvNEh/view?usp=sharing
+
 차량 데이터로 나의 나쁜 운전 습관을 찾아 알려 주고, 그 습관이 자주 나오는 도로 유형에 들어서기 직전에 음성으로 미리 코칭해 주는 Pleos Connect 앱입니다.
 
 ## 실행 방법
 
-1. Android Studio로 이 폴더(`MyRoadCoach`)를 엽니다. Gradle 동기화 중 SDK 라이선스 동의 창이 나오면 내용을 확인하고 동의합니다.
+**APK로 바로 실행**: Pleos Connect 에뮬레이터를 켠 뒤 `adb install apk/MyRoadLAB_MyRoadCoach_release.apk` (또는 APK 파일을 에뮬레이터 창에 끌어다 놓기) → 앱 목록에서 **마이로드 코치** 실행
+
+**소스에서 실행**
+1. Android Studio로 저장소 루트 폴더를 엽니다. Gradle 동기화 중 SDK 라이선스 동의 창이 나오면 내용을 확인하고 동의합니다.
 2. Pleos Connect 에뮬레이터(AVD)를 실행합니다.
 3. 실행 대상으로 에뮬레이터를 선택하고 **Run**을 누릅니다.
-4. 앱 상단의 **시나리오 재생** 버튼을 누르면 약 40초 동안 '출근길' 주행이 재생됩니다.
-   - 주행 시작 → 합류 구간 500m 전 음성 코칭 → 40m 전 제동(늦은 감속 기록)
-   - IC 진출 500m 전 음성 코칭 → 방향지시등 없이 진출(방향지시등 미사용 기록)
-   - 어린이보호구역 과속 안내 → 도착 후 정차 → **오늘의 하이라이트** 화면으로 전환
-5. 하이라이트에서 `앞에 돌발 상황이 있었어요`를 누르면 해당 기록이 습관 분석에서 빠집니다.
-6. 오른쪽 위 마이크 버튼을 누르면 주간 요약을 음성으로 들려줍니다.
+
+**시연 순서** (처음 실행하면 시연용 4주치 샘플 기록으로 시작하며, 화면에 "시연용 샘플"로 표시됩니다)
+1. 오른쪽 위 **··· → 시연 시나리오 재생**을 누르면 약 40초 동안 '출근길'(판교 → 경부고속도로 → 양재IC → 강남) 주행이 재생됩니다.
+   - 합류 구간 500m 전 음성 코칭 → 40m 전 첫 제동 (구간 직전 제동 기록)
+   - 우측 IC 진출 500m 전 음성 코칭 → 우측 방향지시등 없이 진출 (방향지시등 미사용 기록)
+   - 어린이보호구역 단속 카메라 과속 안내 → 도착 후 정차 → **오늘의 하이라이트**로 전환
+2. 하이라이트에서 `앞에 돌발 상황이 있었어요`를 누르면 해당 기록이 습관 분석에서 빠집니다.
+3. **나의 운전 습관**, **성장 리포트** 탭을 확인하고, 성장 리포트의 **이번 주 요약 듣기**(또는 오른쪽 위 스피커 버튼)로 주간 요약을 음성으로 들어 봅니다.
+4. **··· → 주행 기록을 샘플로 초기화**로 처음 상태로 되돌릴 수 있습니다.
 
 release APK 만들기: `./gradlew assembleRelease` → `app/build/outputs/apk/release/app-release.apk`
-(공모전 제출 규칙에 따라 `apk/팀명_앱이름_release.apk`로 복사해 올립니다.)
+(공모전 제출 규칙에 따라 `apk/MyRoadLAB_MyRoadCoach_release.apk`로 올려 두었습니다. 서명은 시연용 debug 키입니다.)
 
 판단 로직 단위 테스트: `./gradlew test`
 
@@ -30,18 +43,17 @@ release APK 만들기: `./gradlew assembleRelease` → `app/build/outputs/apk/re
 - Android Studio (최신 버전), Android SDK API 34
 - minSdk 28 / compileSdk 34 / targetSdk 34, Gradle 8.11.1, AGP 8.7.3, Kotlin 2.0.21, Jetpack Compose
 - Pleos Connect Emulator: 2.1.0 (API 34 system image), 화면 규격 Connect-S-17 (2560×1440, 앱 창 가로 1700×1184 / 세로 840×1184)
-  - 실제로 사용한 에뮬레이터 버전과 화면 규격이 다르면 이 항목을 수정하세요.
 
 ## 사용한 Pleos Connect SDK
 
 | SDK | 버전 | 사용 API | 용도 |
 |---|---|---|---|
-| Vehicle | 2.3.2 | Brake `registerBrakePedalStatus`, Gear `registerGearSelection`, SteeringWheel `registerSteeringWheelAngle`, TurnSignal `registerTurnSignalState` | 늦은 감속·방향지시등 미사용 판별, 주행/정차 전환 |
-| NaviHelper | 3.0.5 | `onTBTInfo`, `onCautionPointInfo`, `onCameraAlert`, `onDestinationArrived` | 도로 유형 판별, 진입 전 코칭 시점, 과속 안내, 주행 종료 |
-| TextToSpeech | 3.3.1 | `TextToSpeech(context, Mode.ON_DEVICE)`, `speak()` | 진입 전 음성 코칭, 주간 요약 음성 |
-| FusedLocation | 1.1.3 | (의존성 포함, 자주 위험했던 지점 근접 알림 확장 예정) | |
+| Vehicle | 2.3.2 | Brake `registerBrakePedalStatus`, Gear `registerGearSelection`, SteeringWheel `registerSteeringWheelAngle`, TurnSignal `registerTurnSignalState`, Wiper `registerWiperState` | 구간 직전 제동·방향지시등 판정, 주행/정차 전환, 우천 추정 |
+| NaviHelper | 3.0.5 | `onTBTInfo`, `onCautionPointInfo`, `onCameraAlert`, `onRouteStarted`, `onReRouteEnded`, `onRouteCancelled`, `onDestinationArrived` | 도로 유형·방향 판별, 진입 전 코칭 시점, 카메라별 과속 판정, 재탐색 시 코칭 취소, 주행 종료 |
+| FusedLocation | 1.1.3 | `registerFusedLocationCallback` | 주행 경로·거리, 위험 순간 위치, 일몰 계산(야간) |
+| TextToSpeech | 3.3.1 | `TextToSpeech(context, Mode.ON_DEVICE)`, `speak()`, `stop()`, `setAudioAttributes()`, `addEventListener()` | 진입 전 음성 코칭, 이번 주 요약 듣기 (오디오 포커스와 함께 사용) |
 
-선언한 권한: `CAR_DRIVE`, `CAR_LIGHTS`, `NAVI_ROUTE`, `FUSED_LOCATION`, `TTS_SERVICE`
+선언한 권한: `CAR_DRIVE`, `CAR_LIGHTS`, `CAR_WINDOWS`, `NAVI_ROUTE`, `FUSED_LOCATION`, `TTS_SERVICE` (인터넷 권한 없음, 주행 기록은 기기 밖으로 보내지 않음)
 
 ## 경로 데이터 출처
 

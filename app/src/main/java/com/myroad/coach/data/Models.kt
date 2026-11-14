@@ -151,7 +151,7 @@ object SampleData {
         RiskMoment(
             1, "08:34", MomentKind.LATE_BRAKE, RoadType.MERGE, rainy = true, night = false,
             cause = "합류 지점 40m 전에서야 브레이크를 밟았어요", mapX = 0.24f, mapY = 0.66f,
-            lat = mergePoint.lat, lng = mergePoint.lng, remainMeters = 40, direction = Direction.LEFT,
+            lat = mergePoint.lat, lng = mergePoint.lng, remainMeters = 40,
             evidence = "브레이크 첫 입력 · 합류 40m 전 (기준 50m 이내)",
         ),
         RiskMoment(

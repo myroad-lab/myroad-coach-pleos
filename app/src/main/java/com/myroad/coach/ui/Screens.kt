@@ -104,7 +104,7 @@ fun DrivingCoachScreen(state: CoachUiState) {
                 }
             }
             val next = state.next
-            if (next != null) {
+            if (next != null && next.remainMeters > 0) {
                 SurfaceCard(Modifier.fillMaxWidth()) {
                     Column {
                         Text("다음 구간", style = PleosType.label.copy(color = PleosColor.text3))
@@ -358,9 +358,10 @@ fun HabitScreen(state: CoachUiState) {
                         }
                         r.weakRoads.forEach { wr ->
                             Row(Modifier.padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Column(Modifier.width(250.dp)) {
-                                    Text(wr.place, style = PleosType.bodyL)
-                                    Text("${HabitAnalyzer.behaviorShort(wr.behavior)} ${wr.risk}/${wr.judged}회", style = PleosType.label.copy(color = PleosColor.text3))
+                                Column(Modifier.width(300.dp)) {
+                                    Text(wr.place, style = PleosType.bodyL, maxLines = 1)
+                                    Text(HabitAnalyzer.behaviorShort(wr.behavior), style = PleosType.label.copy(color = PleosColor.text3), maxLines = 1)
+                                    Text("${wr.risk}/${wr.judged}회", style = PleosType.label.copy(color = PleosColor.text3), maxLines = 1)
                                 }
                                 Box(Modifier.weight(1f).height(24.dp).clip(RoundedCornerShape(12.dp)).background(Color.White)) {
                                     Box(

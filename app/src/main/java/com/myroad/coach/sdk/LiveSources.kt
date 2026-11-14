@@ -11,7 +11,12 @@ import ai.pleos.playground.navi.data.DestinationArrivedInfo
 import ai.pleos.playground.navi.data.TBTInfo
 import ai.pleos.playground.navi.helper.NaviHelper
 import ai.pleos.playground.navi.helper.listener.NaviHelperEventListener
+import ai.pleos.playground.navi.data.RouteStartInfo
 import ai.pleos.playground.vehicle.Vehicle
+import ai.pleos.playground.vehicle.api.model.area.WindowArea
+import ai.pleos.playground.vehicle.constant.area.WindowValue
+import ai.pleos.playground.vehicle.constant.control.WiperState
+import ai.pleos.playground.vehicle.listener.WiperStateListener
 import ai.pleos.playground.vehicle.constant.area.TurnSignalValue
 import ai.pleos.playground.vehicle.constant.control.VehicleGear
 import ai.pleos.playground.vehicle.listener.BrakePedalStatusListener
@@ -27,9 +32,9 @@ import com.myroad.coach.engine.SignalSide
 
 /**
  * 실차(또는 에뮬레이터 버추얼 콘솔) 신호를 CoachEngine으로 전달합니다.
- * - Vehicle SDK: 브레이크 페달, 기어, 조향각, 방향지시등
- * - NaviHelper SDK: 회전 안내(TBT), 주의 구간, 단속 카메라, 목적지 도착
- * - FusedLocation SDK: 위치 (주행 경로, 위험 순간 위치, 주행 거리)
+ * - Vehicle SDK: 브레이크 페달, 기어, 조향각, 방향지시등, 앞유리 와이퍼(우천 추정)
+ * - NaviHelper SDK: 회전 안내(TBT, 방향 포함), 주의 구간, 단속 카메라(id), 재탐색·경로 취소, 목적지 도착
+ * - FusedLocation SDK: 위치·시각·정확도 (주행 경로, 위험 순간 위치, 주행 거리, 일몰 여부)
  * SDK 콜백은 IPC 스레드에서 올 수 있으므로 메인 스레드로 옮겨서 처리합니다.
  * 지원되지 않는 항목은 onFailed로 알려 오며, 해당 기능만 꺼진 채로 앱은 계속 동작합니다.
  */
@@ -82,10 +87,21 @@ class LiveSources(context: Context, private val engine: CoachEngine) {
         override fun onFailed(p0: Exception) = fail("방향지시등", p0)
     }
 
+    private val wiperListener = object : WiperStateListener {
+        override fun onWiperStateUpdated(p0: WiperState?) = ui {
+            if (p0 != null) engine.onWiper(p0 == WiperState.ON)
+        }
+        override fun onFailed(p0: Exception) = fail("와이퍼", p0)
+    }
+
     private val locationListener = object : FusedLocationListener {
         override fun onChanged(p0: LocationData?) {
             val loc = p0 ?: return
-            ui { engine.onLocation(loc.latitude, loc.longitude) }
+            val t = if (loc.timestampMillis > 0L) loc.timestampMillis else System.currentTimeMillis()
+            ui {
+                engine.onLocation(loc.latitude, loc.longitude, t, loc.confidence)
+                engine.onNight(NightCalc.isNight(loc.latitude, loc.longitude, t))
+            }
         }
         override fun onError(p0: Exception) = fail("위치", p0)
     }
@@ -93,7 +109,12 @@ class LiveSources(context: Context, private val engine: CoachEngine) {
     private val naviListener = object : NaviHelperEventListener {
         override fun onTBTInfo(p0: List<TBTInfo>) {
             val first = p0.firstOrNull() ?: return
-            ui { engine.onTbt(RoadTypeMapper.fromTurn(first.type), first.distance.toInt(), first.description) }
+            ui {
+                engine.onTbt(
+                    RoadTypeMapper.fromTurn(first.type), first.distance.toInt(), first.description,
+                    RoadTypeMapper.directionOf(first.type),
+                )
+            }
         }
 
         override fun onCautionPointInfo(p0: List<CautionPoint>) {
@@ -102,10 +123,20 @@ class LiveSources(context: Context, private val engine: CoachEngine) {
         }
 
         override fun onCameraAlert(p0: List<CameraAlert>) {
-            val over = p0.firstOrNull { it.isOverSpeed } ?: return
-            val school = over.type.name.contains("SCHOOL")
-            ui { engine.onCameraAlert(true, over.speedLimit, school) }
+            val alerts = p0.toList()
+            ui {
+                alerts.forEach { a ->
+                    engine.onCameraAlert(
+                        id = a.id, overSpeed = a.isOverSpeed || a.isOverSectionAvrSpeed, speedLimit = a.speedLimit,
+                        inSchoolZone = a.type.name.contains("SCHOOL"), remainMeters = a.remainDistance,
+                    )
+                }
+            }
         }
+
+        override fun onRouteStarted(p0: RouteStartInfo) = ui { engine.onRouteChanged() }
+        override fun onReRouteEnded() = ui { engine.onRouteChanged() }
+        override fun onRouteCancelled() = ui { engine.onRouteChanged() }
 
         override fun onDestinationArrived(p0: DestinationArrivedInfo) = ui { engine.onDestinationArrived() }
     }
@@ -120,6 +151,7 @@ class LiveSources(context: Context, private val engine: CoachEngine) {
             v.getGear().registerGearSelection(gearListener)
             v.getSteeringWheel().registerSteeringWheelAngle(steeringListener)
             v.getTurnSignal().registerTurnSignalState(turnSignalListener)
+            runCatching { v.getWiper().registerWiperState(FRONT, wiperListener) }.onFailure { fail("와이퍼", it) }
             status["Vehicle SDK"] = "연결"
         } catch (e: Throwable) {
             fail("Vehicle SDK", e)
@@ -153,6 +185,7 @@ class LiveSources(context: Context, private val engine: CoachEngine) {
             runCatching { v.getGear().unregisterGearSelection(gearListener) }
             runCatching { v.getSteeringWheel().unregisterSteeringWheelAngle(steeringListener) }
             runCatching { v.getTurnSignal().unregisterTurnSignalState(turnSignalListener) }
+            runCatching { v.getWiper().unregisterWiperState(FRONT, wiperListener) }
             runCatching { v.release() }
         }
         navi?.let { n ->
@@ -175,6 +208,7 @@ class LiveSources(context: Context, private val engine: CoachEngine) {
 
     companion object {
         private const val TAG = "MyRoadLive"
+        private val FRONT = WindowArea(WindowValue.FRONT_WINDSHIELD)
 
         // 아래 import가 실제로 쓰이도록 남겨 둔 참조 (CameraType/CautionPointType 매핑 확장용)
         @Suppress("unused") private val keepTypes = listOf(CameraType::class, CautionPointType::class)

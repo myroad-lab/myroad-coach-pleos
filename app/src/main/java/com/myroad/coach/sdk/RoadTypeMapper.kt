@@ -2,11 +2,16 @@ package com.myroad.coach.sdk
 
 import ai.pleos.playground.navi.constants.CautionPointType
 import ai.pleos.playground.navi.constants.TurnType
+import com.myroad.coach.data.Direction
 import com.myroad.coach.data.RoadType
 
 /** NaviHelper SDK의 회전 안내 유형(TurnType)과 주의 구간 유형(CautionPointType)을 앱의 도로 유형으로 변환합니다. */
 object RoadTypeMapper {
 
+    /**
+     * KEEP_L/R(갈림길에서 한쪽 유지)도 차로를 옮기며 방향지시등이 필요한 '분기'라서 합류·분기로 묶습니다.
+     * 방향은 [directionOf]로 따로 보존합니다.
+     */
     fun fromTurn(type: TurnType): RoadType = when (type) {
         TurnType.TURN_DEVIDE_MERGE,
         TurnType.TURN_KEEP_L, TurnType.TURN_KEEP_R -> RoadType.MERGE
@@ -27,6 +32,22 @@ object RoadTypeMapper {
         TurnType.TURN_TUNNEL -> RoadType.TUNNEL
         TurnType.TURN_TOLL -> RoadType.TOLL
         else -> RoadType.OTHER
+    }
+
+    /**
+     * 회전 안내의 방향. 방향지시등은 이 방향과 같은 쪽이 켜졌을 때만 '정상'으로 봅니다.
+     * 이름 끝의 _L/_R, 좌·우회전, 유턴(좌측), 회전교차로(우측 진출)로 판단하고, 모르면 NONE.
+     */
+    fun directionOf(type: TurnType): Direction {
+        val n = type.name
+        return when {
+            type == TurnType.TURN_LEFT || type == TurnType.TURN_UTURN -> Direction.LEFT
+            type == TurnType.TURN_RIGHT -> Direction.RIGHT
+            n.contains("ROUNDABOUT") -> Direction.RIGHT
+            n.endsWith("_L") -> Direction.LEFT
+            n.endsWith("_R") -> Direction.RIGHT
+            else -> Direction.NONE
+        }
     }
 
     fun fromCaution(type: CautionPointType): RoadType = when (type) {

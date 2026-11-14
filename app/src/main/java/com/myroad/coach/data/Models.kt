@@ -22,14 +22,50 @@ enum class RoadType(val label: String) {
 /** 위도·경도 */
 data class GeoPoint(val lat: Double, val lng: Double)
 
-/** 위험 순간의 종류 = 습관의 단위 */
+/** 위험 순간의 종류 */
 enum class MomentKind(val label: String) {
+    /** 실제 감속도 기반 급제동 (차량 속도 API가 생기면 사용, 지금은 기록하지 않음) */
     HARD_BRAKE("급제동"),
-    LATE_BRAKE("늦은 감속"),
+    /** 감속이 필요한 구간 직전(기준 거리 이내)에서야 처음 제동 */
+    LATE_BRAKE("구간 직전 제동"),
     NO_SIGNAL("방향지시등 미사용"),
-    SPEEDING("과속 안내"),
+    SPEEDING("구간 과속"),
     SHARP_STEER("급조향"),
 }
+
+/** 판정하는 행동. 각 행동은 '판정한 기회(분모)' 대비 '위험 판정(분자)'로 계산합니다. */
+enum class Behavior(val label: String, val unitLabel: String) {
+    PRE_ENTRY_BRAKE("구간 직전 제동", "판정한 감속 구간"),
+    SIGNAL("방향지시등 미사용", "판정한 회전·분기"),
+    ZONE_SPEED("구간 과속", "통과한 단속 구간"),
+}
+
+/** 판정 결과: 정상 / 위험 / 판정 불가(신호 없음·통과 근거 없음 → 분모에서 제외) */
+enum class Outcome(val label: String) { OK("정상"), RISK("위험"), UNDETERMINED("판정 불가") }
+
+/** 회전·분기 방향 (TurnType의 _L/_R 등에서 얻음) */
+enum class Direction(val label: String) { NONE(""), LEFT("좌측"), RIGHT("우측") }
+
+/** 판정 기회 1건 (습관 비율의 분모). 위험이면 해당 위험 순간 id를 연결합니다. */
+data class Check(
+    val behavior: Behavior,
+    val roadType: RoadType,
+    val direction: Direction = Direction.NONE,
+    val outcome: Outcome,
+    val momentId: Int? = null,
+)
+
+fun MomentKind.behavior(): Behavior? = when (this) {
+    MomentKind.LATE_BRAKE -> Behavior.PRE_ENTRY_BRAKE
+    MomentKind.NO_SIGNAL -> Behavior.SIGNAL
+    MomentKind.SPEEDING -> Behavior.ZONE_SPEED
+    else -> null
+}
+
+/** '우측 IC 진출'처럼 방향을 붙인 구간 이름 */
+fun placeLabel(type: RoadType, dir: Direction) =
+    if (dir == Direction.NONE || type in setOf(RoadType.LEFT_TURN, RoadType.RIGHT_TURN, RoadType.U_TURN)) type.label
+    else "${dir.label} ${type.label}"
 
 /** 급제동 분류 (외부 상황 구분) */
 enum class Judgement(val label: String) {
@@ -54,19 +90,42 @@ data class RiskMoment(
     /** 위험 순간이 기록된 실제 위치 (위치 정보가 없으면 null) */
     val lat: Double? = null,
     val lng: Double? = null,
+    /** 구간 진입까지 남은 거리 (구간 직전 제동일 때) */
+    val remainMeters: Int? = null,
+    val direction: Direction = Direction.NONE,
+    /** 판정 근거 (어떤 신호를 보고 판단했는지) */
+    val evidence: String? = null,
 )
 
+enum class HabitStatus { HABIT, OK, INSUFFICIENT }
+
 data class Habit(
+    val behavior: Behavior,
     val title: String,
     val where: String,
+    /** 비율 (%) 문자열. 데이터 부족이면 "—" */
     val value: String,
     val unit: String,
     val metricLabel: String,
+    /** 근거 건수. 예: "4/20회" */
+    val countText: String = "",
+    val status: HabitStatus = HabitStatus.HABIT,
 )
 
-data class WeakRoad(val type: RoadType, val ratio: Float)
+/** 약점 프로필 한 칸 = 행동 × 도로 유형 */
+data class WeakRoad(
+    val type: RoadType,
+    val ratio: Float,
+    val behavior: Behavior = Behavior.PRE_ENTRY_BRAKE,
+    val risk: Int = 0,
+    val judged: Int = 0,
+    val direction: Direction = Direction.NONE,
+) {
+    val place get() = placeLabel(type, direction)
+}
 
-data class WeeklyPoint(val label: String, val merge: Float, val overall: Float)
+/** 주간 추이: 위험 비율(%). 표본이 부족한 주는 null (0으로 채우지 않음) */
+data class WeeklyPoint(val label: String, val merge: Float?, val overall: Float?, val countText: String? = null)
 
 data class CoachingCard(
     val roadType: RoadType,
@@ -74,6 +133,8 @@ data class CoachingCard(
     val headline: String,
     val action: String,
     val reason: String,
+    /** 음성으로도 안내했는지 (오디오 포커스를 못 받으면 화면 카드만) */
+    val voiced: Boolean = true,
 )
 
 /** 정차 중 화면용 예시 데이터. 실제 주행 기록이 쌓이면 CoachEngine이 이 값을 대체합니다. */
@@ -85,46 +146,26 @@ object SampleData {
     private val mergePoint = DemoRoute.points[DemoRoute.MERGE_INDEX - 1]
     private val icPoint = DemoRoute.points[DemoRoute.IC_EXIT_INDEX]
     private val schoolPoint = DemoRoute.points[DemoRoute.SCHOOL_INDEX]
-    val averageMoments = "최근 출근 평균 4.2건"
-
+    
     val moments = listOf(
         RiskMoment(
-            1, "08:34", MomentKind.HARD_BRAKE, RoadType.MERGE, rainy = true, night = false,
+            1, "08:34", MomentKind.LATE_BRAKE, RoadType.MERGE, rainy = true, night = false,
             cause = "합류 지점 40m 전에서야 브레이크를 밟았어요", mapX = 0.24f, mapY = 0.66f,
-            lat = mergePoint.lat, lng = mergePoint.lng,
+            lat = mergePoint.lat, lng = mergePoint.lng, remainMeters = 40, direction = Direction.LEFT,
+            evidence = "브레이크 첫 입력 · 합류 40m 전 (기준 50m 이내)",
         ),
         RiskMoment(
             2, "08:43", MomentKind.NO_SIGNAL, RoadType.IC_EXIT, rainy = true, night = false,
-            cause = "우측 진출 중 방향지시등이 꺼져 있었어요", mapX = 0.58f, mapY = 0.42f,
-            lat = icPoint.lat, lng = icPoint.lng,
+            cause = "우측 IC 진출 중 방향지시등이 꺼져 있었어요", mapX = 0.58f, mapY = 0.42f,
+            lat = icPoint.lat, lng = icPoint.lng, direction = Direction.RIGHT,
+            evidence = "조향 38° (진출 100m 이내) · 우측 방향지시등 OFF",
         ),
         RiskMoment(
             3, "08:49", MomentKind.SPEEDING, RoadType.SCHOOL_ZONE, rainy = true, night = false,
             cause = "제한속도 30km/h 단속 구간이었어요", mapX = 0.80f, mapY = 0.18f,
             lat = schoolPoint.lat, lng = schoolPoint.lng,
+            evidence = "내비 단속 카메라 과속 안내 (카메라 1대당 1회)",
         ),
-    )
-
-    val habits = listOf(
-        Habit("회전·분기할 때 방향지시등을\n자주 놓쳐요", "주로 IC 진출과 우회전에서 나와요", "30", "%", "미사용 비율"),
-        Habit("합류 직전에 늦게 감속해\n급제동해요", "비 오는 날 합류 구간에 집중돼요", "2.7", "회", "100km당 급제동"),
-        Habit("어린이보호구역에서\n속도를 늦게 줄여요", "단속 카메라 과속 안내 기준", "3", "회", "주당 과속 안내"),
-    )
-
-    val weakRoads = listOf(
-        WeakRoad(RoadType.MERGE, 3.1f),
-        WeakRoad(RoadType.IC_EXIT, 2.2f),
-        WeakRoad(RoadType.ROUNDABOUT, 1.6f),
-        WeakRoad(RoadType.TUNNEL, 0.8f),
-    )
-
-    val conditions = listOf("비 오는 날 1.8×", "야간 1.3×", "맑은 낮 1.0×")
-
-    val weekly = listOf(
-        WeeklyPoint("4주 전", 5.6f, 3.2f),
-        WeeklyPoint("3주 전", 4.8f, 2.9f),
-        WeeklyPoint("지난주", 4.0f, 2.6f),
-        WeeklyPoint("이번 주", 2.4f, 2.2f),
     )
 
     /** 습관 분석에서 '약점'으로 판정된 도로 유형. 진입 전 코칭의 대상이 됩니다. */

@@ -61,7 +61,11 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         speaker = Speaker(this).also { it.initialize() }
         val trips = TripRepository(this)
-        engine = CoachEngine(speak = { speaker.speak(it) }, onHistoryChanged = { trips.save(it) })
+        engine = CoachEngine(
+            speak = { speaker.speak(it) },
+            onHistoryChanged = { trips.save(it) },
+            stopSpeaking = { speaker.stop() },
+        )
         engine.setHistory(trips.load())
         scenario = ScenarioPlayer(engine, lifecycleScope)
         live = LiveSources(this, engine).also { it.start() }

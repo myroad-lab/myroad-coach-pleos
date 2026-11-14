@@ -10,6 +10,8 @@
     <uses-permission android:name="pleos.car.permission.CAR_DRIVE" />
     <!-- Vehicle SDK: TurnSignal -->
     <uses-permission android:name="pleos.car.permission.CAR_LIGHTS" />
+    <!-- Vehicle SDK: Wiper (앞유리 와이퍼 → 우천 추정) -->
+    <uses-permission android:name="pleos.car.permission.CAR_WINDOWS" />
     <!-- NaviHelper SDK: TBT / 주의 구간 / 단속 카메라 정보 -->
     <uses-permission android:name="pleos.car.permission.NAVI_ROUTE" />
     <!-- FusedLocation SDK -->

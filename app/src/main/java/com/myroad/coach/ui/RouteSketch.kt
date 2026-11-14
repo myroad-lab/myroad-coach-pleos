@@ -54,7 +54,7 @@ fun TripMapCard(state: CoachUiState, modifier: Modifier) {
                 state.highlightIsSample -> Chip("시연 경로", bg = Color.White, fg = PleosColor.text3, modifier = with(PleosShadow) { Modifier.level1(pill) })
             }
             if (state.moments.any { it.rainy }) {
-                Chip("우천", bg = Color.White, fg = PleosColor.positive, modifier = with(PleosShadow) { Modifier.level1(pill) })
+                Chip("우천 추정", bg = Color.White, fg = PleosColor.positive, modifier = with(PleosShadow) { Modifier.level1(pill) })
             }
         }
     }

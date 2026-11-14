@@ -23,7 +23,11 @@ class TripRepository(context: Context) {
         }
         return try {
             val arr = JSONArray(file.readText())
-            (0 until arr.length()).map { fromJson(arr.getJSONObject(it)) }
+            val trips = (0 until arr.length()).map { fromJson(arr.getJSONObject(it)) }
+            // 판정 기회가 없는 이전 형식의 샘플이면 새 형식 샘플로 교체 (실제 주행 기록은 유지)
+            if (trips.any { it.isSample && it.checks.isEmpty() }) {
+                (SeedTrips.generate(System.currentTimeMillis()) + trips.filter { !it.isSample }).also { save(it) }
+            } else trips
         } catch (e: Exception) {
             Log.w(TAG, "주행 기록을 읽지 못해 샘플로 다시 시작합니다", e)
             SeedTrips.generate(System.currentTimeMillis()).also { save(it) }
@@ -63,6 +67,10 @@ class TripRepository(context: Context) {
         put("isSample", t.isSample)
         // 경로: [위도, 경도, 위도, 경도, ...]
         put("route", JSONArray().apply { t.route.forEach { p -> put(p.lat); put(p.lng) } })
+        // 판정 기회: "행동|도로유형|방향|결과|위험순간id"
+        put("checks", JSONArray().apply {
+            t.checks.forEach { c -> put("${c.behavior.name}|${c.roadType.name}|${c.direction.name}|${c.outcome.name}|${c.momentId ?: ""}") }
+        })
         put("passes", JSONObject().apply { t.passes.forEach { (k, v) -> put(k.name, v) } })
         put("moments", JSONArray().apply {
             t.moments.forEach { m ->
@@ -79,12 +87,16 @@ class TripRepository(context: Context) {
                     put("judgement", m.judgement.name)
                     m.lat?.let { put("lat", it) }
                     m.lng?.let { put("lng", it) }
+                    m.remainMeters?.let { put("remain", it) }
+                    put("direction", m.direction.name)
+                    m.evidence?.let { put("evidence", it) }
                 })
             }
         })
     }
 
     private fun fromJson(o: JSONObject): TripRecord {
+        // 판정 기회(checks)가 없는 이전 버전 기록은 새 지표의 분모를 만들 수 없어 무시됩니다 (load에서 샘플로 교체).
         val passesJson = o.getJSONObject("passes")
         val passes = mutableMapOf<RoadType, Int>()
         passesJson.keys().forEach { k ->
@@ -107,12 +119,22 @@ class TripRepository(context: Context) {
                     judgement = Judgement.valueOf(m.optString("judgement", Judgement.HABIT_SUSPECTED.name)),
                     lat = if (m.has("lat")) m.getDouble("lat") else null,
                     lng = if (m.has("lng")) m.getDouble("lng") else null,
+                    remainMeters = if (m.has("remain")) m.getInt("remain") else null,
+                    direction = runCatching { Direction.valueOf(m.optString("direction", "NONE")) }.getOrDefault(Direction.NONE),
+                    evidence = if (m.has("evidence")) m.getString("evidence") else null,
                 )
             }.getOrNull()
         }
         val routeJson = o.optJSONArray("route")
         val route = if (routeJson == null) emptyList() else
             (0 until routeJson.length() / 2).map { GeoPoint(routeJson.getDouble(it * 2), routeJson.getDouble(it * 2 + 1)) }
+        val checksJson = o.optJSONArray("checks")
+        val checks = if (checksJson == null) emptyList() else (0 until checksJson.length()).mapNotNull { i ->
+            runCatching {
+                val f = checksJson.getString(i).split('|')
+                Check(Behavior.valueOf(f[0]), RoadType.valueOf(f[1]), Direction.valueOf(f[2]), Outcome.valueOf(f[3]), f.getOrNull(4)?.toIntOrNull())
+            }.getOrNull()
+        }
         return TripRecord(
             id = o.getLong("id"),
             startedAt = o.getLong("startedAt"),
@@ -126,6 +148,7 @@ class TripRepository(context: Context) {
             // 이전 버전에 저장된 샘플 기록은 isSample 값이 없으므로 샘플 고유 번호(1,000,000 미만)로 구분
             isSample = o.optBoolean("isSample", o.getLong("id") < 1_000_000L),
             route = route,
+            checks = checks,
         )
     }
 
